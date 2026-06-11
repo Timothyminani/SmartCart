@@ -92,6 +92,7 @@
       <button
         v-for="search in recentSearches"
         :key="search.id"
+        @click="restoreSearch(search)"
         class="group w-full rounded-2xl hover:bg-gray-100 transition"
       >
 
@@ -104,7 +105,7 @@
           <div
             class="w-9 h-9 rounded-xl bg-gray-100 group-hover:bg-white flex items-center justify-center shrink-0"
           >
-            <Search class="w-4 h-4 text-gray-500" />
+            <RotateCcw class="w-4 h-4 text-gray-500" />
           </div>
 
           <div class="flex-1 min-w-0">
@@ -114,7 +115,7 @@
             </p>
 
             <p class="text-xs text-gray-400 mt-1">
-              Recent search
+               {{ formatTime(search.created_at) }}
             </p>
 
           </div>
@@ -130,7 +131,7 @@
           <div
             class="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-white flex items-center justify-center"
           >
-            <Search class="w-4 h-4 text-gray-500" />
+            <RotateCcw class="w-4 h-4 text-gray-500" />
           </div>
 
         </div>
@@ -151,7 +152,9 @@
       <main class="flex-1 flex flex-col">
 
         <!-- SCROLLABLE CONTENT -->
-        <div class="flex-1 overflow-y-auto">
+        <div 
+        ref="resultsContainer"
+        class="flex-1 overflow-y-auto">
 
           <!-- EMPTY STATE -->
           <div
@@ -201,12 +204,34 @@
                 <div class="flex justify-end mb-8 flex-col items-end gap-3">
 
                 <!-- TEXTAREA -->
-                <textarea
-                    v-model="query"
-                    rows="2"
-                    @keyup.enter="runSearchFromQuery"
-                    class="w-full max-w-lg bg-blue-50 text-blue-900 px-4 py-3 rounded-2xl border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-                ></textarea>
+            <textarea
+            ref="queryTextarea"
+            v-model="query"
+            rows="1"
+            @input="autoResize"
+            class="
+                w-full
+                max-w-lg
+
+                bg-blue-50
+                text-blue-900
+
+                px-4
+                py-3
+
+                rounded-2xl
+                border
+                border-blue-200
+
+                resize-none
+                overflow-hidden
+
+                focus:outline-none
+                focus:ring-2
+                focus:ring-blue-300
+            "
+            style="height: auto;"
+            ></textarea>
 
                 <!-- BUTTON -->
             <button
@@ -397,9 +422,21 @@
                     <!-- PRODUCTS -->
                     <div>
 
-                        <h2 class="font-semibold text-lg mb-4">
-                        Recommended Products
-                        </h2>
+            <div class="flex items-center justify-between mb-4">
+
+            <div>
+
+                <h2 class="font-semibold text-lg text-gray-900">
+                Recommended Products
+                </h2>
+
+                <p class="text-sm text-gray-500 mt-1">
+                We found {{ products.length }} products matching your needs
+                </p>
+
+            </div>
+
+            </div>
 
                         <!-- PRODUCT SKELETONS -->
                         <div
@@ -443,12 +480,62 @@
 
                     </div>
 
+<!-- REFIMENT SUGGESTIONS -->
+<div v-if="refinementSuggestions.length" class="mt-8 flex justify-center">
+  <div class="w-full max-w-2xl">
+
+  <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+    
+    You might also ask
+  </h3>
+
+  <div class="flex flex-col gap-2">
+
+    <button
+      v-for="(q, index) in refinementSuggestions"
+      :key="index"
+      @click="query = q; runSearchFromQuery()"
+      class="
+        group
+        flex items-start gap-3
+        text-left
+        px-4 py-3
+        rounded-xl
+        border border-gray-100
+        bg-white
+        hover:bg-blue-50
+        hover:border-blue-200
+        transition
+      "
+    >
+
+      <!-- Reply-style icon -->
+      <div class="mt-0.5 text-blue-500">
+        <CornerDownRight class="w-4 h-4" />
+      </div>
+
+      <!-- Question text -->
+      <span class="text-sm text-gray-700 group-hover:text-blue-700 leading-relaxed">
+        {{ q }}
+      </span>
+
+    </button>
+</div>
+  </div>
+
+</div>
+
+
+
+
+
 </div>
                     
 
 
-       
 
+
+    
       </main>
 
     </div>
@@ -464,7 +551,9 @@ import { usePage, router } from '@inertiajs/vue3'
 import axios from 'axios'
 import { marked } from 'marked'
 import { computed } from 'vue'
-import { PanelLeft, Search, ChevronDown, ChevronUp, RotateCcw } from 'lucide-vue-next'
+import { PanelLeft, Search, ChevronDown, ChevronUp, RotateCcw,  CornerDownRight } from 'lucide-vue-next'
+import { nextTick } from 'vue'
+import { watch } from 'vue'
 
 
 const page = usePage()
@@ -475,6 +564,55 @@ const ai_explanation = ref('')
 const products = ref([])
 const sidebarOpen = ref(true)
 const showFullExplanation = ref(false)
+const recentSearches = ref([])
+const refinementSuggestions = ref([])
+const resultsContainer = ref(null)
+const currentPage = ref(1)
+const lastPage = ref(1)
+const totalProducts = ref(0)
+const loadingMore = ref(false)
+const displayedExplanation = ref('')
+const typingSpeed = 10
+
+
+
+onMounted(() => {
+
+  query.value =
+    new URLSearchParams(window.location.search).get('q') || ''
+
+  loadSearchHistory()
+
+  // try restore existing search first
+  const existingSearch = recentSearches.value.find(
+    item => item.query === query.value
+  )
+
+  if (existingSearch) {
+
+    ai_explanation.value = existingSearch.ai_explanation
+
+  displayedExplanation.value = existingSearch.ai_explanation
+
+    refinementSuggestions.value =
+      existingSearch.refinement_suggestions || []
+
+    products.value = existingSearch.products
+
+    showFullExplanation.value = false
+
+    nextTick(() => {
+      autoResize()
+    })
+
+  } else {
+
+    // only fetch if not cached
+    fetchAIResults()
+
+  }
+
+})
 
 
 
@@ -491,8 +629,11 @@ const fetchAIResults = async () => {
 
     console.log("AI RESPONSE:", res.data)
     ai_explanation.value = res.data.ai_explanation
+    typeExplanation(ai_explanation.value)
+    refinementSuggestions.value = res.data.refinement_suggestions || []
     products.value = res.data.products
-    
+    saveSearchToHistory()
+
   } catch (error) {
     console.error(error)
   } finally {
@@ -501,21 +642,18 @@ const fetchAIResults = async () => {
 }
 
 
-onMounted(() => {
-  query.value = new URLSearchParams(window.location.search).get('q') || ''
-  fetchAIResults()
-})
 
-
-const formattedExplanation = computed(() => {
-  return marked(ai_explanation.value || '')
-})
 
 
 
 
 const runSearchFromQuery = async () => {
   if (!query.value.trim()) return
+
+  resultsContainer.value?.scrollTo({
+  top: 0,
+  behavior: 'smooth'
+})
 
   loading.value = true
   products.value = []
@@ -527,7 +665,11 @@ const runSearchFromQuery = async () => {
     })
 
     ai_explanation.value = res.data.ai_explanation
+    typeExplanation(ai_explanation.value)
+    refinementSuggestions.value = res.data.refinement_suggestions || []
     products.value = res.data.products
+    saveSearchToHistory()
+
   } catch (error) {
     console.error(error)
   } finally {
@@ -538,9 +680,159 @@ const runSearchFromQuery = async () => {
 
 
 
-const recentSearches = [
-  { id: 1, query: 'Laptop for programming' },
-  { id: 2, query: 'Gaming phone under 50k' },
-  { id: 3, query: 'Wireless headphones' }
-]
+
+
+const queryTextarea = ref(null)
+
+const autoResize = async () => {
+  await nextTick()
+
+  const textarea = queryTextarea.value
+
+  if (!textarea) return
+
+  textarea.style.height = '0px'
+  textarea.style.height = textarea.scrollHeight + 'px'
+}
+
+onMounted(() => {
+  autoResize()
+})
+
+watch(query, () => {
+  autoResize()
+})
+
+
+
+
+const saveSearchToHistory = () => {
+
+  const existingSearches = JSON.parse(
+    localStorage.getItem('smartcart_searches')
+  ) || []
+
+  // remove duplicate query if it already exists
+  const filtered = existingSearches.filter(
+    item => item.query !== query.value
+  )
+
+  // new search object
+  const newSearch = {
+    id: Date.now(),
+    query: query.value,
+    ai_explanation: ai_explanation.value,
+    refinement_suggestions: refinementSuggestions.value,
+    products: products.value,
+    created_at: new Date().toISOString()
+  }
+
+  // add newest at top
+  filtered.unshift(newSearch)
+
+  // limit to 10 searches
+  const limited = filtered.slice(0, 10)
+
+  localStorage.setItem(
+    'smartcart_searches',
+    JSON.stringify(limited)
+  )
+
+loadSearchHistory()
+
+
+}
+
+const loadSearchHistory = () => {
+
+  recentSearches.value = JSON.parse(
+    localStorage.getItem('smartcart_searches')
+  ) || []
+
+}
+
+
+const restoreSearch = (search) => {
+
+  query.value = search.query
+
+  ai_explanation.value = search.ai_explanation
+
+ displayedExplanation.value = search.ai_explanation
+
+  refinementSuggestions.value = search.refinement_suggestions || []
+
+  products.value = search.products
+
+  showFullExplanation.value = false
+
+ nextTick(() => {
+    autoResize()
+  })
+
+}
+
+
+
+const typeExplanation = async (text) => {
+
+  displayedExplanation.value = ''
+
+  for (let i = 0; i < text.length; i++) {
+
+    displayedExplanation.value += text.charAt(i)
+
+    await new Promise(resolve =>
+      setTimeout(resolve, typingSpeed)
+    )
+
+  }
+
+}
+
+
+const formattedExplanation = computed(() => {
+  return marked(displayedExplanation.value || '')
+})
+
+
+
+
+const formatTime = (date) => {
+
+  const now = new Date()
+  const created = new Date(date)
+
+  const diffInSeconds =
+    Math.floor((now - created) / 1000)
+
+  if (diffInSeconds < 60) {
+    return 'Just now'
+  }
+
+  const diffInMinutes =
+    Math.floor(diffInSeconds / 60)
+
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} min ago`
+  }
+
+  const diffInHours =
+    Math.floor(diffInMinutes / 60)
+
+  if (diffInHours < 24) {
+    return `${diffInHours} hr ago`
+  }
+
+  const diffInDays =
+    Math.floor(diffInHours / 24)
+
+  if (diffInDays < 7) {
+    return `${diffInDays} day ago`
+  }
+
+  return created.toLocaleDateString()
+
+}
+
 </script>

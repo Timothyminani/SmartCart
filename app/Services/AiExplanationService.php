@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Http;
 
 class AiExplanationService
 {
-    public function generate(string $query, array $intent, $products): string
+    public function generate(string $query, array $intent, $products): array
     {
         
         // =========================
@@ -107,11 +107,7 @@ Use bold labels for important attributes:
 
 Leave ONE empty line between sections.
 
-DO NOT use tables.
-
 DO NOT return HTML.
-
-Return clean markdown only.
 
 ==================================================
 IMPORTANT RULES
@@ -119,7 +115,6 @@ IMPORTANT RULES
 
 - Sound like a premium AI shopping assistant
 - Be conversational and intelligent
-- DO NOT output JSON
 - DO NOT repeat raw attributes
 - DO NOT hallucinate specifications
 - Keep explanations concise but informative
@@ -128,7 +123,6 @@ IMPORTANT RULES
 - Mention tradeoffs naturally
 - Make the response feel modern and AI-native
 
-Return ONLY valid markdown.
 
 IMPORTANT MARKDOWN RULES:
 - Use # for main headings
@@ -215,6 +209,69 @@ Only include specifications relevant to the user's query.
 - Keep tables concise
 ";
 
+$prompt .= "
+
+==================================================
+FINAL RESPONSE FORMAT
+==================================================
+
+Return your response STRICTLY in valid JSON format.
+
+Use this exact structure:
+
+{
+  \"ai_explanation\": \"markdown formatted explanation here\",
+  \"refinement_suggestions\": [
+    \"suggestion 1\",
+    \"suggestion 2\",
+    \"suggestion 3\"
+  ]
+}
+
+IMPORTANT RULES:
+
+- ai_explanation MUST contain markdown
+
+- refinement_suggestions are NOT conversational questions
+
+- refinement_suggestions MUST behave like:
+  - search refinements
+  - shopping filters
+  - buying constraints
+  - product narrowing suggestions
+
+GOOD EXAMPLES:
+- Lightweight laptops for travel
+- RTX laptops for video editing
+- Budget gaming laptops under 60k
+- OLED display creator laptops
+- Quiet laptops for office work
+- Long battery ultrabooks
+- Premium laptops for developers
+
+BAD EXAMPLES:
+- What is your budget?
+- Do you have a preferred brand?
+- What software will you use?
+- Budget: under 50k
+- RAM: 16GB
+- Display: Full HD
+- Battery: 5 hours
+
+- Suggestions should be short
+- Suggestions should feel clickable
+- Suggestions should NOT sound like a conversation
+- Avoid sounding like filters or forms
+- Suggestions should feel like something users would actually search for
+- They should be not more than 5 suggestions
+- The questions should be based on common shopping constraints and refinements users typically consider when shopping for laptops and also should be somehow related to the user's query.
+- DO NOT return HTML
+- DO NOT wrap JSON in code blocks
+- Return ONLY valid JSON
+
+If you do not return valid JSON, the system will reject your response.
+";
+
         // =========================
         // GPT-4o MINI (Replicate)
         // =========================
@@ -223,7 +280,7 @@ Only include specifications relevant to the user's query.
     ->post('https://api.replicate.com/v1/models/openai/gpt-4o-mini/predictions', [
         'input' => [
             'prompt' => $prompt,
-            'system_prompt' => 'You are a senior ecommerce AI that explains product recommendations clearly and briefly.',
+            'system_prompt' => 'You are SmartCart AI. Always follow the user prompt exactly. Return ONLY valid JSON with ai_explanation (markdown) and refinement_suggestions array. No exceptions.',
             'max_tokens' => 400,
             'temperature' => 0.4,
         ]
@@ -249,23 +306,45 @@ for ($i = 0; $i < 15; $i++) {
 
     if (($result['status'] ?? null) === 'succeeded') {
 
-        $output = $result['output'] ?? null;
+    $output = $result['output'] ?? null;
 
-        $text = is_array($output)
-            ? implode('', $output)
-            : $output;
+    $text = is_array($output)
+        ? implode('', $output)
+        : $output;
 
-        return trim($text ?? '');
+    $decoded = json_decode(trim($text ?? ''), true);
+
+    if (!$decoded) {
+        return [
+            'ai_explanation' => $text ?? '',
+            'refinement_suggestions' => []
+        ];
     }
 
+    return [
+        'ai_explanation' => $decoded['ai_explanation'] ?? '',
+        'refinement_suggestions' => $decoded['refinement_suggestions'] ?? []
+    ];
+}
+
+
+
+
     if (($result['status'] ?? null) === 'failed') {
-        return 'AI explanation generation failed.';
+
+     return [
+    'ai_explanation' => 'AI explanation generation failed.',
+    'refinement_suggestions' => []
+];
     }
 
         sleep(2); // wait before next poll
 }
 
 
-return 'AI explanation is taking longer than expected.';
+return [
+    'ai_explanation' => 'AI explanation is taking longer than expected.',
+    'refinement_suggestions' => []
+];
     }
 }

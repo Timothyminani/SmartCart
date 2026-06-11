@@ -20,15 +20,35 @@
       <div class="mt-10 flex justify-center">
   <div class="w-full max-w-2xl">
 
-    <div class="relative bg-white border border-gray-200 rounded-2xl shadow-md focus-within:shadow-lg transition p-4">
+    <div class="relative bg-white border border-gray-200 rounded-3xl shadow-md focus-within:shadow-lg transition p-4">
 
       <!-- TEXTAREA (multi-line like AI prompt) -->
             <textarea
-            v-model="prompt"
-            rows="2"
-            placeholder="Ask anything... e.g. 'affordable laptop for programming'"
-            class="w-full resize-none bg-transparent text-lg placeholder-gray-400 pr-12 outline-none border-none focus:outline-none focus:ring-0 focus:border-none"
-            ></textarea>
+  v-model="prompt"
+  rows="1"
+  @input="autoResize"
+  placeholder="Ask anything... e.g. 'affordable laptop for programming'"
+  class="
+    w-full
+    resize-none
+    overflow-hidden
+    bg-transparent
+    text-lg
+    placeholder-gray-400
+
+    pl-10
+    pr-14
+    pb-3
+
+    min-h-[44px]
+    max-h-40
+
+    outline-none
+    border-none
+    focus:outline-none
+    focus:ring-0
+  "
+></textarea>
 
       <!-- LEFT BOTTOM (+ icon) -->
       <button class="absolute bottom-3 left-3 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition">
@@ -552,7 +572,12 @@ router.visit(
 
 
 
+const autoResize = (event) => {
+  const textarea = event.target
 
+  textarea.style.height = 'auto'
+  textarea.style.height = textarea.scrollHeight + 'px'
+}
 
 
 

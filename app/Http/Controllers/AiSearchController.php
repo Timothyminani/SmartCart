@@ -68,7 +68,8 @@ class AiSearchController extends Controller
     'query' => $query,
     'intent' => $intent,
     'products' => $products,
-    'ai_explanation' => $aiExplanation,
+    'ai_explanation' => $aiExplanation['ai_explanation'],
+    'refinement_suggestions' => $aiExplanation['refinement_suggestions'],
 ]);
 
     }
