@@ -75,305 +75,254 @@ class GenerateAiComparison implements ShouldQueue
         }
     }
 
-    private function buildPrompt($products)
-    {
-        $productText = '';
 
-        foreach ($products as $index => $product) {
+private function buildPrompt($products)
+{
+    $productText = '';
 
-            $productText .= "
+    foreach ($products as $index => $product) {
+
+        $productText .= "
 Product " . ($index + 1) . ":
 Name: {$product->name}
 Price: {$product->sale_price}
 Brand: {$product->brand->name}
+Category: {$product->category->name}
 
 Attributes:
 ";
 
-            foreach ($product->attributes as $attribute) {
+        foreach ($product->attributes as $attribute) {
 
-                $productText .= "- {$attribute->attribute_name}: {$attribute->attribute_value}\n";
-            }
-
-            $productText .= "\n";
+            $productText .= "- {$attribute->attribute_name}: {$attribute->attribute_value}\n";
         }
 
-        return "
-You are an advanced ecommerce AI product comparison engine.
+        $productText .= "\n";
+    }
 
-Your job is to act like a professional product analyst (like Amazon + Tech reviewer combined).
+  
 
-Compare the products below using structured reasoning.
+return "
+You are an advanced ecommerce AI comparison engine.
+
+Your job is to compare products intelligently based on:
+
+- specifications
+- pricing
+- usability
+- quality
+- real-world experience
+- value for money
+
+You must behave like a professional ecommerce product analyst.
+
+=====================================================
+PRODUCTS
+=====================================================
 
 $productText
 
 =====================================================
-CRITICAL INSTRUCTIONS
+IMPORTANT RULES
 =====================================================
 
-- Return ONLY valid JSON
-- No markdown, no explanation, no extra text
-- DO NOT include objects inside arrays
-- ALL arrays must contain ONLY STRINGS
-- Be analytical, not descriptive
-- Do NOT copy product names into sentences unless necessary
+- Return ONLY clean Markdown
+- Do NOT return JSON
+- Do NOT return code blocks
+- Do NOT return explanations outside markdown
+- Be analytical and realistic
+- Never invent specifications
+- Base analysis ONLY on provided attributes
+- Mention both strengths and weaknesses honestly
+- Mention tradeoffs clearly
+- Avoid generic marketing language
 
 =====================================================
-EVALUATION FRAMEWORK
+IMPORTANT CATEGORY RULE
 =====================================================
 
-You MUST evaluate products using these dimensions:
-
-1. Performance (CPU, GPU, RAM)
-2. Display quality
-3. Battery life
-4. Storage
-5. Build quality
-6. Price vs value
-7. Target use case fit
-
-Each comparison MUST be meaningful and not generic.
-
-=====================================================
-SCORING RULES
-=====================================================
-
-- Scores range from 0 to 10
-- Higher score = better in that category
-- Be realistic and comparative between products
-
-=====================================================
-OUTPUT STRUCTURE (STRICT)
-=====================================================
-
-{
-  \"summary\": \"Executive summary\",
-
-  \"winner\": {
-    \"product_name\": \"Short product name\",
-    \"overall_score\": 91,
-    \"reason\": \"Why this product wins overall\"
-  },
-
-  \"best_for\": {
-    \"gaming\": \"Short product name\",
-    \"business\": \"Short product name\",
-    \"students\": \"Short product name\",
-    \"content_creation\": \"Short product name\",
-    \"travel\": \"Short product name\"
-  },
-
-  \"comparison\": {
-    \"performance\": {
-      \"winner\": \"Short product name\",
-      \"reason\": \"Why it wins\"
-    },
-    \"display\": {
-      \"winner\": \"Short product name\",
-      \"reason\": \"Why it wins\"
-    },
-    \"battery\": {
-      \"winner\": \"Short product name\",
-      \"reason\": \"Why it wins\"
-    },
-    \"storage\": {
-      \"winner\": \"Short product name\",
-      \"reason\": \"Why it wins\"
-    },
-    \"value_for_money\": {
-      \"winner\": \"Short product name\",
-      \"reason\": \"Why it wins\"
-    }
-  },
-
-  \"scores\": {
-    \"Short product name\": {
-      \"overall\": 82
-    },
-    \"Short product name\": {
-      \"overall\": 91
-    }
-  }
-}
-
-
-IMPORTANT:
-
-A more expensive product should NOT automatically win.
-
-The overall winner must be determined by balancing:
-
-- Performance
-- Features
-- User experience
-- Value for money
-- Intended audience
-
-If one product is significantly more expensive, justify why the additional cost is or is not worthwhile.
-
-DECISION RULES
-
-When determining an overall winner:
-
-- Performance has the highest importance for gaming laptops
-- Battery and portability have the highest importance for business laptops
-- Display quality has high importance for creator laptops
-- Value for money must always be considered
-
-Do not treat all categories equally.
-
-The winner should reflect the intended use case of the product category.
-
-
-SCORING RULES
-
-Overall score must be calculated from:
-
-- Performance
-- Display
-- Battery
-- Storage
-- Value for money
-
-The score must reflect actual differences between products.
-
-Avoid giving products nearly identical scores unless they are genuinely very similar.
-
-
-VALUE FOR MONEY RULE
-
-A product is not automatically better because it is more expensive.
-
-If a product costs significantly more, determine whether the additional features justify the additional cost.
-
-Price should influence the final recommendation.
-
-
-The summary must be 2-3 sentences.
-
-Explain:
-
-- Main difference
-- Who should buy Product A
-- Who should buy Product B
-
-
-IMPORTANT NAMING RULE:
-
-- NEVER use product_id in output
-- ALWAYS use short product name (without brand) in output
-- product_1 and product_2 labels are NOT allowed
-
-
-IMPORTANT WINNER RULE (IMPORTANT):
-
-The overall winner MUST be the product that wins most weighted categories:
-
-- Performance = 30%
-- Display = 15%
-- Battery = 15%
-- Storage = 10%
-- Value = 30%
-
-If a product wins value but loses all performance categories, it cannot be overall winner.
-
-
-
-BEST_FOR RULE (VERY IMPORTANT):
-
-Each category MUST include:
-
-- product_name
-- reason (why it fits that use case)
-
-Format:
-
-\"gaming\": {
-  \"product_name\": \"HP Spectre x360\",
-  \"reason\": \"Better GPU performance makes it more suitable for light gaming and creative workloads\"
-}
-
-\"reason\": \"...why this fits user type...\",
-  \"tradeoff\": \"...what you sacrifice by choosing it...\"
-
-
-BATTERY COMPARISON RULES
-
-When evaluating battery:
-
-1. Compare battery capacity (Wh) first.
-2. Compare rated battery life (hours) second.
-3. Higher Wh generally indicates larger battery capacity.
-4. Longer rated battery life indicates better endurance.
-5. If one product has both higher Wh and longer battery life, it MUST win the battery category.
-6. Do NOT choose a winner because a battery is \"sufficient\", \"adequate\", or \"good enough\".
-7. Battery winner must be determined from specifications, not user type.
+The comparison MUST adapt dynamically depending on the product category.
 
 Examples:
 
-70Wh + 18 hours > 50Wh + 15 hours
+- Laptops:
+  performance, display, battery, portability
 
-83Wh + 15 hours > 57Wh + 15 hours
+- Washing machines:
+  capacity, efficiency, wash quality, noise
 
-If battery specifications clearly favor one product, do NOT declare the weaker battery the winner.
+- Printers:
+  print quality, print speed, ink efficiency
 
+- TVs:
+  resolution, brightness, refresh rate, smart features
 
+- Furniture:
+  comfort, materials, durability, size
 
-PERFORMANCE COMPARISON RULES
+- Phones:
+  camera, battery, performance, display
 
-Compare:
+DO NOT force irrelevant comparison categories.
 
-- CPU generation
-- CPU core count
-- CPU architecture
-- GPU capability
-- RAM capacity
+=====================================================
+MARKDOWN STRUCTURE
+=====================================================
 
-A product with a significantly stronger CPU and GPU should win performance.
+Use markdown sections EXACTLY like this:
 
-Do NOT select a weaker processor because it is cheaper.
+# Overall Verdict
 
+Explain:
+- which product wins overall
+- why it wins
+- important tradeoffs
 
-STORAGE COMPARISON RULES
+Example:
 
-Compare:
+The **MacBook Air M3** is the better overall laptop because it offers excellent battery life, premium build quality, and strong real-world performance.
 
-- Capacity
-- SSD vs eMMC
-- SSD generation if available
+The **ASUS TUF Gaming A15** is better for gaming and GPU-intensive workloads.
 
-Larger and faster storage wins.
+---
 
-Value-for-money considerations belong in the value category, not storage.
+#Score Comparison
 
+Create a markdown table.
 
-DISPLAY COMPARISON RULES
+Example:
 
-Compare:
+| Category | Product A | Product B |
+|---|---|---|
+| Performance | 89 | 93 |
+| Battery | 97 | 74 |
+| Display | 90 | 86 |
+| Value | 84 | 91 |
 
-- Resolution
-- Panel technology (OLED, IPS, Mini LED)
-- Refresh rate
-- Brightness
-- Color accuracy
+Categories MUST adapt dynamically depending on the product type.
 
-A display with superior specifications should win display.
+---
 
-Do NOT choose a weaker display because it is sufficient for basic users.
+#Strengths
 
+Create strengths section for EACH product.
 
+Example:
 
+## Product Name
+- Strength 1
+- Strength 2
+- Strength 3
 
+---
+
+# Weaknesses
+
+Create weaknesses section for EACH product.
+
+Example:
+
+## Product Name
+- Weakness 1
+- Weakness 2
+
+---
+
+# Best For
+
+Recommend products for different users.
+
+Examples:
+- Students
+- Professionals
+- Gamers
+- Families
+- Budget buyers
+- Travelers
+
+Use ONLY categories that make sense for the product type.
+
+Example:
+
+## Best For Students
+
+**Product Name**
+
+Reason why it fits students.
+
+---
+
+# Key Differences
+
+Mention major real-world differences.
+
+Examples:
+- Better battery
+- Better gaming performance
+- Better efficiency
+- Better build quality
+- Better value
+
+Explain WHY those differences matter.
+
+---
+
+# Buying Advice
+
+Provide practical buying advice.
+
+Example:
+
+Choose Product A if:
+- portability matters most
+- battery life is important
+- you travel often
+
+Choose Product B if:
+- gaming matters most
+- maximum performance matters
+- upgradeability matters
+
+=====================================================
+SCORING RULES
+=====================================================
+
+Scores must:
+- be realistic
+- reflect actual differences
+- consider specifications
+- consider pricing
+- consider usability
+- consider value for money
+
+Do NOT give nearly identical scores unless products are genuinely similar.
+
+=====================================================
+VALUE FOR MONEY RULE
+=====================================================
+
+A more expensive product is NOT automatically better.
+
+Determine whether:
+- extra features justify the extra cost
+- performance improvements are meaningful
+- cheaper options offer better overall value
 
 =====================================================
 FINAL RULES
 =====================================================
 
-- Be objective and analytical
-- Do NOT be generic
-- DO NOT repeat same point in multiple sections
-- Every section must add new insight
-- DO NOT output invalid JSON under any condition
+- Return ONLY clean Markdown
+- Do NOT return JSON
+- Do NOT wrap markdown in code blocks
+- Do NOT return explanations outside markdown
+- Keep formatting professional and readable
 ";
-    }
+
+
+
+
+}
+
+
 }

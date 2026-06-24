@@ -1,5 +1,4 @@
 
-
 <template>
     <div class="flex h-screen bg-gray-100">
 
@@ -14,7 +13,7 @@
             <!-- Navigation -->
             <nav class="flex-1 p-4 space-y-2">
 
-                <Link href="/dashboard"
+                <Link href="/admin/dashboard"
                       class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">
                     <LayoutDashboard size="18" />
                     Dashboard

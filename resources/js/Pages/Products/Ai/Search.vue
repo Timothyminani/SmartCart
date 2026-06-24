@@ -481,7 +481,7 @@
                     </div>
 
 <!-- REFIMENT SUGGESTIONS -->
-<div v-if="refinementSuggestions.length" class="mt-8 flex justify-center">
+<div v-if="refinementSuggestions.length" class="mb-8 flex justify-center">
   <div class="w-full max-w-2xl">
 
   <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
@@ -525,6 +525,99 @@
 
 </div>
 
+ <!-- Browse Catalog Bunner -->
+
+<div class="mb-12 flex justify-center">
+
+  <div
+ class="
+    relative
+    overflow-hidden
+    rounded-3xl
+    w-full
+    max-w-4xl
+    min-h-[260px]
+
+    bg-cover
+    bg-center
+
+    p-8
+    text-white
+    shadow-xl
+  "
+  :style="{
+    backgroundImage: `url(${bannerImage})`
+  }"
+>
+
+    <!-- DARK OVERLAY -->
+    <div class="absolute inset-0 bg-black/55"></div>
+
+    <!-- CONTENT -->
+    <div
+      class="
+        relative
+        z-10
+        h-full
+
+        flex
+        flex-col
+        md:flex-row
+
+        items-start
+        md:items-center
+
+        justify-between
+        gap-6
+      "
+    >
+
+      <!-- TEXT -->
+      <div class="max-w-xl">
+
+        <p class="text-sm uppercase tracking-wider text-blue-200 mb-2">
+          Explore More
+        </p>
+
+        <h2 class="text-3xl font-bold mb-3 leading-tight">
+          Browse Our Full Product Catalog
+        </h2>
+
+        <p class="text-gray-200 leading-7">
+          Discover trending products, explore categories,
+          and shop with powerful filters beyond AI search.
+        </p>
+
+      </div>
+
+      <!-- BUTTON -->
+      <a
+        href="/productListing"
+        class="
+          shrink-0
+          px-6
+          py-3
+          rounded-2xl
+
+          bg-white
+          text-black
+          font-semibold
+
+          hover:bg-gray-100
+          transition
+        "
+      >
+        Browse Catalog
+      </a>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
 
 
 
@@ -554,7 +647,7 @@ import { computed } from 'vue'
 import { PanelLeft, Search, ChevronDown, ChevronUp, RotateCcw,  CornerDownRight } from 'lucide-vue-next'
 import { nextTick } from 'vue'
 import { watch } from 'vue'
-
+import bannerImage from '@/assets/images/banner4.jpg'
 
 const page = usePage()
 const query = ref('')

@@ -22,7 +22,7 @@ class ReplicateService
 
             'input' => [
                 'prompt' => $prompt,
-                'system_prompt' => 'You are an expert ecommerce AI product comparison engine that returns only valid JSON.',
+                'system_prompt' => 'You are an expert ecommerce AI product comparison engine that returns only professional markdown.',
                 'max_tokens' => 1500,
                 'temperature' => 0.5,
             ]
@@ -30,6 +30,11 @@ class ReplicateService
     );
 
     $data = $response->json();
+
+   
+logger('REPLICATE RESPONSE', $response->json());
+
+
 
     if (!isset($data['id'])) {
 
@@ -82,40 +87,47 @@ class ReplicateService
     /**
      * EXTRACT CLEAN OUTPUT
      */
-    private function extractOutput($data)
+    /**
+
+* EXTRACT CLEAN OUTPUT
+  */
+
+private function extractOutput($data)
 {
+    // DEBUG THE FULL RESPONSE
+    logger('FULL REPLICATE RESPONSE', $data);
+
     $output = $data['output'] ?? null;
+
+    if (!$output) {
+
+        // Sometimes output may not exist directly
+        if (isset($data['prediction']['output'])) {
+            $output = $data['prediction']['output'];
+        }
+    }
 
     if (!$output) {
         throw new \Exception('No AI output returned');
     }
 
+    // Convert array chunks to string
     if (is_array($output)) {
         $output = implode('', $output);
     }
 
     $output = trim($output);
 
-    // 🔥 REMOVE markdown code blocks
-    $output = preg_replace('/```json|```/', '', $output);
+    // Remove accidental code fences
+    $output = str_replace([
+        '```markdown',
+        '```md',
+        '```'
+    ], '', $output);
 
-    // 🔥 EXTRACT ONLY JSON PART
-    $start = strpos($output, '{');
-    $end = strrpos($output, '}');
-
-    if ($start === false || $end === false) {
-        throw new \Exception('No JSON found in AI output');
-    }
-
-    $json = substr($output, $start, $end - $start + 1);
-
-    $decoded = json_decode($json, true);
-
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        throw new \Exception('JSON Parse Error: ' . json_last_error_msg());
-    }
-
-    return $decoded;
+    return trim($output);
 }
+
+
 
 }

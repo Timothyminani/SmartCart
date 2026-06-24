@@ -74,7 +74,7 @@
 
   </div>
 
-  <!-- 🟢 DEFAULT MODE (BANNER) -->
+  <!--  DEFAULT MODE (BANNER) -->
 <div v-else class="relative rounded-xl overflow-hidden h-48 md:h-56">
 
   <!-- BACKGROUND IMAGE -->
@@ -308,7 +308,7 @@
 import AppLayout from '@/Layouts/AppLayout.vue'
 import ProductCard from '@/Components/ProductCard.vue'
 import { Search, ShoppingCart, LayoutDashboard,  ArrowDown, Loader2 } from 'lucide-vue-next'
-import BannerImage from '@/assets/images/img1.jpg'
+import BannerImage from '@/assets/images/banner4.jpg'
 import { router, Link } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import { watch } from 'vue'

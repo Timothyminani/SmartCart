@@ -15,6 +15,5 @@ class AiComparison extends Model
 
     protected $casts = [
         'product_ids' => 'array',
-        'result' => 'array',
     ];
 }

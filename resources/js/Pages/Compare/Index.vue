@@ -1,12 +1,18 @@
 <template>
   <AppLayout>
-    <div class="min-h-screen bg-gray-50 border border-3 border-gray-800">
+    <div class="min-h-screen bg-gray-50 ">
 
-      <div class="max-w-7xl mx-auto px-4 py-10 ">
+      <div class="max-w-7xl mx-auto px-10 py-10 ">
+
+
 
         <!-- HEADER -->
  <div
-  class="relative overflow-hidden bg-white border border-blue-100 rounded-3xl p-8 mb-8"
+  class="relative overflow-hidden
+         bg-gradient-to-br from-white via-white to-blue-50/40
+         shadow-xl rounded-[2rem]
+         p-10 lg:p-9 mb-10
+         ring-1 ring-blue-100"
 >
 
   <!-- Decorative Background -->
@@ -59,6 +65,8 @@
   </div>
 
 </div>
+<!-- END OF HEADER -->
+
 
 
 
@@ -76,67 +84,83 @@
           </p>
 
         </div>
+<!-- END OF EMPTY STATE -->
 
-        <!-- COMPARE CONTENT -->
-        <div v-else class="space-y-8  ">
 
-          <!-- PRODUCTS -->
-         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
+
+
+
+        <!-- COMPARE CONTENT COMPARE CONTENT COMPARE CONTENT COMPARE CONTENT -->
+
+<div v-else class="space-y-8 ">
+
+
+
+          <!-- PRODUCTS COMPARE HIGHLIGHT-->
+
+<div class="relative">
+
+  <!-- VS BADGE -->
   <div
-    v-for="product in products"
-    :key="product.id"
-    class="bg-white border rounded-3xl p-6"
+    class="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
   >
+    <div
+      class="w-16 h-16 rounded-full bg-white text-blue-600 flex items-center justify-center text-lg font-bold shadow-xl border-4 border-white"
+    >
+      <span class="text-2xl">V</span>S
+    </div>
+  </div>
 
-    <div class="flex gap-4">
+  <!-- PRODUCTS -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      <!-- Image -->
-      <div class="flex-shrink-0">
-        <img
-          :src="product.images?.[0]
-            ? `/storage/${product.images[0].image_path}`
-            : '/placeholder.png'"
-          class="w-28 h-28 object-cover rounded-2xl border"
-        />
-      </div>
+    <div
+      v-for="product in products"
+      :key="product.id"
+      class="bg-white shadow-lg rounded-3xl p-6"
+    >
 
-      <!-- Content -->
-      <div class="flex-1 flex flex-col">
+      <div class="flex gap-4">
 
-        <!-- Brand Badge -->
-        <div>
-          <span
-            class="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-medium"
-          >
-            {{ product.brand?.name }}
-          </span>
+        <!-- Image -->
+        <div class="flex-shrink-0">
+          <img
+            :src="product.images?.[0]
+              ? `/storage/${product.images[0].image_path}`
+              : '/placeholder.png'"
+            class="w-28 h-28 object-cover rounded-2xl border"
+          />
         </div>
 
-        <!-- Product Name -->
-        <h2 class="text-lg font-semibold mt-3 text-gray-900 line-clamp-2">
-          {{ product.name }}
-        </h2>
+        <!-- Content -->
+        <div class="flex-1 flex flex-col">
 
-        <!-- Price -->
-        <div class="mt-4">
-          <p class="text-xs uppercase tracking-wide text-gray-500">
-            Price
-          </p>
+          <!-- Brand Badge -->
+          <div>
+            <span
+              class="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-medium"
+            >
+              {{ product.brand?.name }}
+            </span>
+          </div>
 
-          <p class="text-2xl font-bold text-blue-600">
-            KES {{ format(product.sale_price) }}
-          </p>
-        </div>
+          <!-- Product Name -->
+          <h2 class="text-lg font-semibold mt-3 text-gray-900 line-clamp-2">
+            {{ product.name }}
+          </h2>
 
-        <!-- Footer -->
-        <div class="mt-auto pt-4">
-          <button
-            @click="remove(product.id)"
-            class="text-sm text-gray-500 hover:text-red-500 transition"
-          >
-            Remove from comparison
-          </button>
+          <!-- Price -->
+          <div class="mt-4">
+            <p class="text-xs uppercase tracking-wide text-gray-500">
+              Price
+            </p>
+
+            <p class="text-2xl font-bold text-blue-600">
+              KES {{ format(product.sale_price) }}
+            </p>
+          </div>
+
         </div>
 
       </div>
@@ -146,19 +170,23 @@
   </div>
 
 </div>
+<!-- END OF PRODUCTS COMPARE HIGHLIGHT-->
+
+
+
 
 
           <!-- ================= SPEC TABLE ================= -->
-          <div class="overflow-x-auto">
+ <div class="overflow-x-auto rounded-3xl shadow-lg border border-gray-200 bg-white">
 
-  <table class="w-full border border-gray-200">
+  <table class="w-full  bg-white">
 
     <thead>
 
       <tr class="bg-blue-50">
 
         <th
-          class="border border-gray-200 p-4 text-left w-56 font-semibold"
+          class="border border-gray-200 p-4 text-left w-56 font-semibold "
         >
           Specification
         </th>
@@ -166,7 +194,7 @@
         <th
           v-for="p in products"
           :key="p.id"
-          class="border border-gray-200 p-4 text-left min-w-[280px]"
+          class="border border-gray-200 p-4 text-left min-w-[100px]"
         >
 
           <div class="flex items-center gap-3">
@@ -204,7 +232,7 @@
       >
 
         <td
-          class="border border-gray-200 p-4 font-medium text-gray-800 bg-gray-50 capitalize"
+          class="border border-gray-200 p-4 font-medium text-gray-800 bg-white capitalize"
         >
           {{ attr }}
         </td>
@@ -224,272 +252,166 @@
   </table>
 
 </div>
+<!-- ================= END OF SPEC TABLE ================= -->
 
 
 
 
 
 
+    <!-- ================= AI WORKSPACE ================= -->
 
-          <!-- ================= AI SECTION (BELOW TABLE) ================= -->
-          
-<!-- AI ACTION -->
-<div class="bg-white rounded-3xl border p-6 mt-6">
-
-  <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-
-    <div>
-      <h2 class="text-xl font-semibold flex items-center gap-2">
-        <Sparkles class="w-5 h-5 text-blue-600" />
-        AI Insight
-      </h2>
-
-      <p class="text-sm text-gray-500 mt-1">
-        Get smart AI comparison + recommendation
-      </p>
-    </div>
-
-    <button
-      @click="generateAI"
-      :disabled="aiLoading"
-      class="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-3 rounded-2xl text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-    >
-      <span v-if="!aiLoading">
-        Generate AI Insight
-      </span>
-
-      <span v-else class="flex items-center gap-2">
-        <svg
-          class="animate-spin h-4 w-4 text-white"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            class="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            stroke-width="4"
-          />
-
-          <path
-            class="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v4l3-3-3-3v4A10 10 0 002 12h2z"
-          />
-        </svg>
-
-        Analyzing Products...
-      </span>
-    </button>
-
-  </div>
-
-</div>
-
-<!-- AI LOADING STATE -->
 <div
-  v-if="aiLoading"
-  class="bg-white rounded-3xl border p-6 mt-6 animate-pulse"
+  class="relative overflow-hidden
+         bg-gradient-to-br from-white via-white to-blue-50/30
+         rounded-[2rem]
+         border border-blue-100
+         shadow-xl
+         mt-8"
 >
 
-  <div class="flex items-center gap-3 mb-6">
-    <div class="w-10 h-10 rounded-full bg-blue-100"></div>
+  <!-- Decorative Background -->
+  <div class="absolute top-0 right-0 w-72 h-72 bg-blue-100/30 blur-3xl rounded-full"></div>
 
-    <div>
-      <div class="h-4 w-40 bg-gray-200 rounded mb-2"></div>
-      <div class="h-3 w-64 bg-gray-100 rounded"></div>
-    </div>
-  </div>
+  <div class="relative p-8 lg:p-10">
 
-  <!-- fake cards -->
-  <div class="space-y-4">
+    <!-- HEADER -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
 
-    <div class="border rounded-2xl p-4">
-      <div class="h-4 w-32 bg-gray-200 rounded mb-3"></div>
-      <div class="h-3 w-full bg-gray-100 rounded mb-2"></div>
-      <div class="h-3 w-5/6 bg-gray-100 rounded"></div>
-    </div>
+      <!-- LEFT -->
+      <div>
 
-    <div class="border rounded-2xl p-4">
-      <div class="h-4 w-40 bg-gray-200 rounded mb-3"></div>
-      <div class="h-3 w-full bg-gray-100 rounded mb-2"></div>
-      <div class="h-3 w-4/6 bg-gray-100 rounded"></div>
-    </div>
-
-    <div class="border rounded-2xl p-4">
-      <div class="h-4 w-24 bg-gray-200 rounded mb-3"></div>
-      <div class="h-3 w-full bg-gray-100 rounded mb-2"></div>
-      <div class="h-3 w-3/6 bg-gray-100 rounded"></div>
-    </div>
-
-  </div>
-
-  <!-- AI Thinking -->
-  <div class="mt-6 flex items-center gap-2 text-sm text-gray-500">
-    <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-    <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-100"></div>
-    <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-200"></div>
-
-    <span class="ml-2">
-      AI is comparing specifications and analyzing value...
-    </span>
-  </div>
-
-</div>
-
-
-
-
-
-
-<!-- AI RESULT -->
-<!-- AI RESULT -->
-<div v-if="aiResult" class="bg-white rounded-3xl border p-6 mt-6 space-y-8">
-
-
-<div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
-
-  <h3 class="font-semibold text-blue-700 mb-2">
-    🧠 Summary
-  </h3>
-
-  <p class="text-gray-700">
-    {{ aiResult?.summary }}
-  </p>
-
-</div>
-
-
-
-
-
-
-  <!-- ================= TOP VERDICT ================= -->
-
-  <div class="text-center border-b pb-6">
-
-  <div class="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-full text-sm mb-4">
-    🏆 AI Recommendation
-  </div>
-
-  <h2 class="text-2xl font-bold text-gray-900">
-    {{ aiResult?.winner?.product_name }}
-  </h2>
-
-  <p class="text-gray-600 mt-3">
-    Overall Score: {{ aiResult?.winner?.overall_score }}/100
-  </p>
-
-  <p class="text-gray-700 mt-2 max-w-2xl mx-auto">
-    {{ aiResult?.winner?.reason }}
-  </p>
-
-</div>
-
-
-  <!-- ================= QUICK COMPARISON ================= -->
-  <div>
-
-    <h3 class="font-semibold text-lg mb-4">⚖️ Quick Comparison</h3>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-      <div
-        v-for="(item, key) in aiResult.comparison || {}"
-        :key="key"
-        class="border rounded-2xl p-4 bg-gray-50"
-      >
-
-        <div class="flex justify-between items-center mb-2">
-
-          <p class="font-medium capitalize">
-            {{ key.replace(/_/g, ' ') }}
-          </p>
-
-          <span class="text-xs px-3 py-1 bg-white border rounded-full">
-            Winner:
-            {{ item?.winner?.product_name || item?.winner }}
-          </span>
-
+        <div
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-full
+                 bg-gradient-to-r from-blue-600 to-indigo-600
+                 text-white text-sm font-medium shadow-md"
+        >
+          <Sparkles class="w-4 h-4" />
+          AI Product Intelligence
         </div>
 
-        <p class="text-sm text-gray-600">
-          {{ item?.reason }}
+        <h2 class="text-3xl font-bold text-gray-900 mt-5">
+          Smart Product Analysis
+        </h2>
+
+        <p class="text-gray-500 mt-3 max-w-xl">
+          Generate AI-powered comparison insights, strengths,
+          weaknesses, buying advice and real-world recommendations.
         </p>
 
       </div>
 
-    </div>
+      <!-- RIGHT -->
+      <div>
 
-  </div>
+        <button
+          @click="generateAI"
+          :disabled="aiLoading"
+          class="bg-gradient-to-r from-blue-600 to-indigo-600
+                 hover:from-blue-700 hover:to-indigo-700
+                 text-white px-6 py-4 rounded-2xl
+                 font-medium shadow-lg shadow-blue-200
+                 transition-all duration-300
+                 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
 
+          <span
+            v-if="!aiLoading"
+            class="flex items-center gap-2"
+          >
+            <Sparkles class="w-5 h-5" />
+            Generate AI Insight
+          </span>
 
-<!-- ================= Overall Scores ================= -->
+          <span
+            v-else
+            class="flex items-center gap-2"
+          >
 
-<div class="mt-6">
+            <svg
+              class="animate-spin h-5 w-5 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
 
-  <h3 class="font-semibold text-lg mb-4">📊 Overall Scores</h3>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4l3-3-3-3v4A10 10 0 002 12h2z"
+              />
+            </svg>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            Analyzing...
+          </span>
 
-    <div
-      v-for="(data, name) in aiResult.scores"
-      :key="name"
-      class="border rounded-2xl p-4 bg-gray-50"
-    >
-
-      <p class="font-semibold mb-2">
-        {{ name }}
-      </p>
-
-      <div class="w-full bg-gray-200 rounded-full h-3">
-        <div
-          class="bg-blue-600 h-3 rounded-full"
-          :style="`width: ${data.overall}%`"
-        ></div>
-      </div>
-
-      <p class="text-sm text-gray-600 mt-2">
-        {{ data.overall }}/100
-      </p>
-
-    </div>
-
-  </div>
-
-</div>
-
-  <!-- ================= BEST FOR ================= -->
-<div>
-
-  <h3 class="font-semibold text-lg mb-4">🎯 Best For You</h3>
-
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-    <div
-      v-for="(item, key) in aiResult.best_for || {}"
-      :key="key"
-      class="border rounded-2xl p-4 bg-gray-50"
-    >
-
-      <div class="flex justify-between items-center mb-2">
-
-        <p class="font-semibold capitalize">
-          {{ key.replace(/_/g, ' ') }}
-        </p>
+        </button>
 
       </div>
 
-      <p class="text-sm text-gray-900 font-medium">
-        {{ item.product_name }}
-      </p>
+    </div>
 
-      <p class="text-sm text-gray-600 mt-1">
-        {{ item.reason }}
-      </p>
+    <!-- LOADING STATE -->
+    <div
+  v-if="aiLoading"
+  class="mt-10 border-t border-gray-100 pt-8"
+>
+
+  <!-- TOP LOADING -->
+  <div class="flex items-center gap-3 mb-8">
+
+    <div class="flex gap-1">
+
+      <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+      <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-100"></div>
+      <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-200"></div>
+
+    </div>
+
+    <p class="text-sm text-gray-500">
+      AI is generating comparison insights...
+    </p>
+
+  </div>
+
+  <!-- SKELETON CONTENT -->
+  <div class="space-y-5 animate-pulse">
+
+    <!-- Skeleton Block -->
+    <div class="bg-white/70 rounded-3xl border border-gray-100 p-6">
+
+      <div class="h-5 w-48 bg-gray-200 rounded mb-5"></div>
+
+      <div class="space-y-3">
+
+        <div class="h-3 w-full bg-gray-100 rounded"></div>
+        <div class="h-3 w-11/12 bg-gray-100 rounded"></div>
+        <div class="h-3 w-9/12 bg-gray-100 rounded"></div>
+
+      </div>
+
+    </div>
+
+    <!-- Skeleton Block -->
+    <div class="bg-white/70 rounded-3xl border border-gray-100 p-6">
+
+      <div class="h-5 w-36 bg-gray-200 rounded mb-5"></div>
+
+      <div class="space-y-3">
+
+        <div class="h-3 w-full bg-gray-100 rounded"></div>
+        <div class="h-3 w-10/12 bg-gray-100 rounded"></div>
+        <div class="h-3 w-7/12 bg-gray-100 rounded"></div>
+
+      </div>
 
     </div>
 
@@ -497,15 +419,92 @@
 
 </div>
 
+
+
+    <!-- AI RESULT -->
+    <div
+      v-if="aiResult"
+      class="mt-10 border-t border-gray-100 pt-10"
+    >
+
+      <div
+        class="max-w-none text-gray-800
+               prose prose-lg
+               prose-h1:text-3xl
+               prose-h2:text-2xl
+               prose-h3:text-xl
+               prose-headings:font-semibold
+               prose-headings:text-gray-900
+               prose-headings:mb-4
+               prose-headings:mt-8
+               prose-p:leading-8
+               prose-p:my-3
+               prose-ul:my-3
+               prose-li:my-2
+               prose-li:marker:text-black
+               prose-table:my-6
+               prose-th:bg-blue-50
+               prose-th:p-3
+               prose-td:p-3
+               prose-hr:my-8"
+        v-html="renderMarkdown(displayedAiResult)"
+      ></div>
+
+<div
+  v-if="displayedAiResult.length < aiResult.length"
+  class="mt-2"
+>
+  <span class="inline-block w-2 h-5 bg-blue-600 animate-pulse rounded-sm"></span>
 </div>
 
 
 
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ================= END AI WORKSPACE ================= -->
 
 
 
+<!-- FINAL DECISION SECTION -->
+<div
+ 
+  class="mt-10"
+ >
 
+  <!-- HEADER -->
+  <div class="flex items-center justify-between mb-6">
 
+    <div>
+
+      <h2 class="text-2xl font-bold text-gray-900">
+        Ready to Choose?
+      </h2>
+
+      <p class="text-gray-500 mt-2">
+        Add your preferred product to cart or continue exploring.
+      </p>
+
+    </div>
+
+  </div>
+
+  <!-- PRODUCTS -->
+  <div class="flex flex-col md:flex-row justify-center gap-10">
+
+    <ProductCard
+      v-for="product in products"
+      :key="product.id"
+      :product="product"
+       compact
+    />
+
+  </div>
+
+</div>
 
 
 
@@ -522,37 +521,78 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { Sparkles, GitCompare } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import axios from 'axios'
-import { onUnmounted } from 'vue'
+import MarkdownIt from 'markdown-it'
+import ProductCard from '@/Components/ProductCard.vue'
+
 
 const props = defineProps({
   products: Array
 })
 
 const products = computed(() => props.products || [])
+const displayedAiResult = ref('')
 
-const aiSummary = ref('')
-const loading = ref(false)
+/*
+|--------------------------------------------------------------------------
+| AI STATE
+|--------------------------------------------------------------------------
+*/
+
 const aiLoading = ref(false)
 const aiResult = ref(null)
 const comparisonId = ref(null)
 const pollInterval = ref(null)
 
+/*
+|--------------------------------------------------------------------------
+| MARKDOWN
+|--------------------------------------------------------------------------
+*/
 
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  breaks: true
+})
+
+const renderMarkdown = (text) => {
+  if (!text) return ''
+  return md.render(text)
+}
+
+/*
+|--------------------------------------------------------------------------
+| FORMATTERS
+|--------------------------------------------------------------------------
+*/
 
 const format = (v) => new Intl.NumberFormat().format(v)
 
+/*
+|--------------------------------------------------------------------------
+| REMOVE PRODUCT
+|--------------------------------------------------------------------------
+*/
+
 const remove = (id) => {
+
   const updated = products.value.filter(p => p.id !== id)
 
   router.get(route('compare.index'), {
     products: updated.map(p => p.id)
   })
+
 }
 
-// AI SIMULATION (later we replace with backend + replicate)
+/*
+|--------------------------------------------------------------------------
+| GENERATE AI
+|--------------------------------------------------------------------------
+*/
+
 const generateAI = async () => {
 
   aiLoading.value = true
@@ -572,12 +612,17 @@ const generateAI = async () => {
 
     console.error(err)
 
+    aiLoading.value = false
+
   }
 
 }
 
-
-
+/*
+|--------------------------------------------------------------------------
+| POLLING
+|--------------------------------------------------------------------------
+*/
 
 const startPolling = () => {
 
@@ -585,29 +630,36 @@ const startPolling = () => {
 
     try {
 
-      const res = await axios.get(`/compare/ai/${comparisonId.value}`)
+      const res = await axios.get(
+        `/compare/ai/${comparisonId.value}`
+      )
 
       if (res.data.status === 'completed') {
 
         aiResult.value = res.data.result
+        typeAiResult(res.data.result)
+
+        aiLoading.value = false
 
         stopPolling()
 
-        aiLoading.value = false
-console.log("AI RESULT SET:", res.data.result)
+        console.log('AI RESULT:', res.data.result)
+
       }
 
       if (res.data.status === 'failed') {
 
-        stopPolling()
-
         aiLoading.value = false
+
+        stopPolling()
 
       }
 
     } catch (err) {
 
       console.error(err)
+
+      aiLoading.value = false
 
       stopPolling()
 
@@ -617,43 +669,88 @@ console.log("AI RESULT SET:", res.data.result)
 
 }
 
-
-
-
 const stopPolling = () => {
 
   if (pollInterval.value) {
+
     clearInterval(pollInterval.value)
+
     pollInterval.value = null
+
   }
 
 }
-
 
 onUnmounted(() => {
   stopPolling()
 })
 
+/*
+|--------------------------------------------------------------------------
+| SPEC TABLE HELPERS
+|--------------------------------------------------------------------------
+*/
 
 const mergedAttributes = computed(() => {
+
   const attributes = []
 
   products.value.forEach(product => {
+
     product.attributes?.forEach(attr => {
+
       if (!attributes.includes(attr.attribute_name)) {
+
         attributes.push(attr.attribute_name)
+
       }
+
     })
+
   })
 
   return attributes
+
 })
 
 const getValue = (product, attr) => {
+
   const found = product.attributes?.find(
     a => a.attribute_name === attr
   )
 
   return found?.attribute_value || '—'
+
 }
+
+
+
+
+
+
+// Type out the AI result character by character
+
+const typeAiResult = (text) => {
+
+  displayedAiResult.value = ''
+
+  let index = 0
+
+  const speed = 8
+
+  const interval = setInterval(() => {
+
+    displayedAiResult.value += text.charAt(index)
+
+    index++
+
+    if (index >= text.length) {
+      clearInterval(interval)
+    }
+
+  }, speed)
+
+}
+
+
 </script>

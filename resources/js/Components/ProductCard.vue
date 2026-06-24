@@ -1,9 +1,19 @@
 
 <template>
-  <div class="bg-white rounded-xl border border-gray-100 hover:shadow-md transition overflow-hidden group h-[340px] flex flex-col">
+  <div
+  :class="[
+    'bg-white rounded-xl border border-gray-100 hover:shadow-md transition overflow-hidden group flex flex-col',
+    compact ? 'h-[290px] w-[260px]' : 'h-[340px]'
+  ]"
+>
 
     <!-- IMAGE -->
-    <div class="relative h-40 bg-gray-100 overflow-hidden">
+  <div
+  :class="[
+    'relative bg-gray-100 overflow-hidden',
+    compact ? 'h-40' : 'h-40'
+  ]"
+>
 <Link
  v-if="product?.slug"
  :href="route('products.show', { product: product.slug })">
@@ -52,7 +62,9 @@
       </p>
 
       <!-- ⭐ RATING -->
-      <div class="flex items-center gap-1 mt-1 text-yellow-400">
+      <div 
+       v-if="!compact"
+      class="flex items-center gap-1 mt-1 text-yellow-400">
         <Star class="w-3 h-3 fill-yellow-400" />
         <Star class="w-3 h-3 fill-yellow-400" />
         <Star class="w-3 h-3 fill-yellow-400" />
@@ -65,7 +77,9 @@
       <div class="mt-auto pt-2 space-y-2">
 
         <!-- Compare -->
-        <label class="flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer">
+        <label 
+         v-if="!compact"
+        class="flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer">
   <input
   type="checkbox"
   class="accent-blue-600"
@@ -158,8 +172,12 @@ const loading = ref(false)
 // ✅ 1. define props FIRST
 const props = defineProps({
   product: Object,
-  showAiBadge: Boolean
+  showAiBadge: Boolean,
+  compact: Boolean
 })
+
+
+
 
 // ✅ 2. useCart AFTER props
 const { addToCart, increaseQty, decreaseQty, getCartItem, removeItem } = useCart()
