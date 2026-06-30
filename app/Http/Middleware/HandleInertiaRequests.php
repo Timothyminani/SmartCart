@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use App\Models\Order;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -39,6 +40,13 @@ class HandleInertiaRequests extends Middleware
             'success' => fn () => $request->session()->get('success'),
             'error' => fn () => $request->session()->get('error'),
         ],
+
+         'admin' => [
+            'pendingOrdersCount' => auth()->check()
+                ? Order::where('status', 'pending')->count()
+                : 0,
+        ],
+
         
         ];
     }

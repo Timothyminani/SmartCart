@@ -16,6 +16,9 @@ use App\Http\Controllers\Frontend\PaymentController;
 use App\Http\Controllers\CompareController;
 use Illuminate\Support\Facades\Http;
 use App\Http\Controllers\AiSearchController;
+use App\Http\Controllers\Admin\AdminOrderController;
+use Illuminate\Support\Facades\Mail;
+use App\Http\Controllers\InvoiceController;
 // Customize Routes
 
 
@@ -52,6 +55,17 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::put('/products/{product}', [ProductController::class, 'update'])->name('admin.products.update');
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])
     ->name('admin.products.destroy');
+
+    // Orders
+     Route::get('/orders', [AdminOrderController::class, 'index'])
+            ->name('admin.orders.index');
+
+    Route::get('/orders/{order}', [AdminOrderController::class, 'show'])
+            ->name('admin.orders.show');
+
+    Route::patch('/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])
+            ->name('admin.orders.update-status');
+            
 
 });
 
@@ -162,25 +176,17 @@ Route::middleware('auth')->group(function () {
 });
 
 
+// Invoice Routes
 
+Route::middleware('auth')->get(
+    '/orders/{order}/invoice',
+    [InvoiceController::class, 'customer']
+)->name('orders.invoice');
 
-
-Route::get('/test-ai', function () {
-
-    $response = Http::withToken(
-        config('services.replicate.token')
-    )->post(
-        'https://api.replicate.com/v1/models/meta/meta-llama-3-8b-instruct/predictions',
-        [
-            'input' => [
-                'prompt' => 'Explain why gaming laptops need better cooling systems.'
-            ]
-        ]
-    );
-
-    return $response->json();
-});
-
+Route::middleware(['auth','admin'])
+    ->get('/admin/orders/{order}/invoice',
+        [InvoiceController::class, 'admin'])
+    ->name('admin.orders.invoice');
 
 
 

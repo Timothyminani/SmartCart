@@ -32,12 +32,7 @@ import { ShoppingBag, ShieldCheck, Truck } from 'lucide-vue-next';
 
     <div class="relative h-full flex flex-col z-10 max-w-xl py-10 px-10 justify-between ">
 
-<!-- LOGO -->
-    <div class="absolute top-0 left-0 rounded-br-lg">
-        <Link href="/">
-            <ApplicationLogo class="h-20 w-50" />
-        </Link>
-    </div>
+
         
         <div>
 

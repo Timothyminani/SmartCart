@@ -3,31 +3,49 @@
 
     <div class="max-w-4xl mx-auto px-6 py-12 space-y-8">
 
-      <!-- ================= HEADER ================= -->
-      <div class="bg-white rounded-2xl p-6 border shadow-sm">
+    <!-- ================= HEADER ================= -->
+<div class="bg-white rounded-2xl p-6 border shadow-sm">
 
-        <div class="flex items-start justify-between">
+    <div class="flex items-start justify-between">
 
-          <div>
+        <div>
             <h1 class="text-xl font-semibold text-gray-800">
-              Order #{{ order.id }}
+                Order #{{ order.id }}
             </h1>
 
             <p class="text-sm text-gray-500 mt-1">
-              {{ formatDate(order.created_at) }}
+                {{ formatDate(order.created_at) }}
             </p>
-          </div>
-
-          <span
-            class="px-3 py-1 rounded-full text-xs font-medium capitalize"
-            :class="statusClasses(order.status)"
-          >
-            {{ order.status || 'processing' }}
-          </span>
-
         </div>
 
-      </div>
+        <span
+            class="px-3 py-1 rounded-full text-xs font-medium capitalize"
+            :class="statusClasses(order.status)"
+        >
+            {{ order.status || 'processing' }}
+        </span>
+
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="mt-6 flex flex-wrap gap-3">
+
+        <!-- Download Invoice -->
+        <a
+            :href="`/orders/${order.id}/invoice`"
+            target="_blank"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+                   bg-blue-600 text-white text-sm font-medium
+                   hover:bg-blue-700 transition"
+        >
+            <Download class="w-4 h-4" />
+
+            Download Invoice
+        </a>
+
+    </div>
+
+</div>
 
      <!-- ================= DYNAMIC TRACKING ================= -->
 <div class="bg-white rounded-2xl p-6 border shadow-sm">
@@ -122,7 +140,8 @@ import {
   Package,
   Truck,
   Home,
-    CheckCircle
+  CheckCircle,
+  Download
 } from 'lucide-vue-next'
 
 const props = defineProps({

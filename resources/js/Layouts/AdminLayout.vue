@@ -72,11 +72,24 @@
     </div>
 </div>
 
-                <Link href="/admin/orders"
-                      class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">
-                    <ShoppingCart size="18" />
-                    Orders
-                </Link>
+        <Link
+            href="/admin/orders"
+            class="flex items-center justify-between p-2 rounded hover:bg-gray-800"
+        >
+
+            <div class="flex items-center gap-3">
+                <ShoppingCart size="18" />
+                <span>Orders</span>
+            </div>
+
+            <span
+                v-if="pendingOrdersCount > 0"
+                class="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full"
+            >
+                {{ pendingOrdersCount }}
+            </span>
+
+        </Link>
 
 
                
@@ -137,10 +150,13 @@
             <Bell class="text-gray-600 hover:text-gray-800" size="27" />
 
             <!-- Notification Badge -->
-            <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs 
-                         w-4 h-4 flex items-center justify-center rounded-full">
-                3
-            </span>
+        <span
+            v-if="pendingOrdersCount > 0"
+            class="absolute -top-1 -right-1 bg-red-500 text-white text-xs
+                w-5 h-5 flex items-center justify-center rounded-full"
+        >
+            {{ pendingOrdersCount }}
+        </span>
         </div>
 
         <!-- User Name -->
@@ -209,10 +225,14 @@ import {
     Users
 } from 'lucide-vue-next'
 
+
 const page = usePage()
 const show = ref(false)
 const user = page.props.auth.user
 const openProducts = ref(false)
+
+const pendingOrdersCount =
+    page.props.admin.pendingOrdersCount
 
 
 watch(

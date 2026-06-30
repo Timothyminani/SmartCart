@@ -7,6 +7,9 @@ use App\Models\Cart;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
+use App\Mail\OrderPlacedMail;
+use App\Mail\NewOrderAdminMail;
+use Illuminate\Support\Facades\Mail;
 
 class CheckoutController extends Controller
 {
@@ -75,6 +78,18 @@ public function store(Request $request)
             ]);
         }
 
+                // Load relationships for email
+        $order->load('user', 'items.product');
+
+        // Customer email
+        Mail::to($order->user->email)
+            ->queue(new OrderPlacedMail($order));
+
+            // Admin email
+        Mail::to('admin@smartcart.test')
+            ->queue(new NewOrderAdminMail($order));
+
+       // 4. Clear Cart
         $cart->items()->delete();
 
         return response()->json([
@@ -116,6 +131,8 @@ foreach ($cart->items as $item) {
 
 }
 
+
+
 // 3. Create Payment
 $payment = Payment::create([
     'order_id' => $order->id,
@@ -125,8 +142,22 @@ $payment = Payment::create([
     'status' => 'pending',
     'address' => $request->address,
     'delivery_method' => $request->delivery,
-    'payment_method' => 'mpesa'
+    'payment_method' => 'mpesa'   
 ]);
+
+
+
+
+// Load relationships
+$order->load('user', 'items.product');
+
+// Customer email
+  Mail::to($order->user->email)
+    ->queue(new OrderPlacedMail($order));
+
+ // Admin email
+ Mail::to('admin@smartcart.test')
+      ->queue(new NewOrderAdminMail($order));
 
 // 4. Clear Cart
 $cart->items()->delete();
