@@ -1,168 +1,504 @@
 
 <template>
-    <div class="flex h-screen bg-gray-100">
+    <div class="flex p-2 gap-2 h-screen bg-gradient-to-r from-blue-50 via-white to-white ">
 
-        <!-- Sidebar -->
-        <aside class="w-64 bg-gray-900 text-white flex flex-col">
+  <!-- Sidebar -->
+<aside
+    :class="[
+        collapsed ? 'w-24' : 'w-72',
+        'bg-white/20 backdrop-blur-2xl border border-white/30 rounded-2xl shadow-xl flex flex-col transition-all duration-300'
+    ]"
+>
 
-            <!-- Logo -->
-            <div class="p-6 text-2xl font-bold border-b border-gray-700">
-                Ecommerce Admin
-            </div>
+    <!-- ================================= -->
+    <!-- Logo -->
+    <!-- ================================= -->
+    <div class="flex items-center justify-between p-3 border-b-2 border-gray-100">
 
-            <!-- Navigation -->
-            <nav class="flex-1 p-4 space-y-2">
+       
 
-                <Link href="/admin/dashboard"
-                      class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">
-                    <LayoutDashboard size="18" />
-                    Dashboard
-                </Link>
+            <img
+            v-if="!collapsed"
+                :src="logo"
+                alt="SmartCart Logo"
+                class="h-16 w-60 "
+            />
 
-              <Link href="/admin/orders"
-                      class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">
-                    <Users size="18" />
-                    Users
-                </Link>
+            
+                <img
+                    v-else
+                    :src="logo"
+                    class="w-10 h-10 object-contain"
+                />
 
 
-                <Link href="/admin/categories"
-                      class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">
-                    <Folder size="18" />
-                    Categories
-                </Link>
+            <div>
+                
 
-                <Link href="/admin/brands"
-                      class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">
-                    <Tags size="18" />
-                    Brands
-                </Link>
+                
+           
 
-               <div>
-    <!-- Parent -->
-    <button 
-        @click="openProducts = !openProducts"
-        class="w-full flex items-center justify-between p-2 rounded hover:bg-gray-800"
-    >
-        <div class="flex items-center gap-3">
-            <ShoppingBag size="18" />
-            <span>Products</span>
         </div>
 
-        <ChevronDown 
-            size="16" 
-            :class="{'rotate-180': openProducts}" 
-            class="transition"
-        />
-    </button>
+       <button
+       v-if="!collapsed"
+    @click="collapsed = !collapsed"
+    class="p-2 rounded-lg hover:bg-white/30 transition"
+>
+    <PanelLeft 
+    class="w-7 h-7 text-gray-700" 
+    />
 
-    <!-- Dropdown -->
-    <div v-if="openProducts" class="ml-8 mt-2 space-y-1">
+  
+    
+</button>
 
-        <Link href="/admin/products"
-              class="block text-gray-400 text-sm hover:text-gray-100  hover:bg-gray-800 p-2 border-full rounded">
-            All Products
-        </Link>
+ <button
+v-if="collapsed"
+    @click="collapsed=false"
+    class="p-2 rounded-lg hover:bg-white/30 transition"
+>
+   
+  <PanelRight 
+    class="w-7 h-7 text-gray-700" 
+   />
+    
+</button>
 
-        <Link href="/admin/products/create"
-              class="block text-gray-400 text-sm hover:text-gray-100 hover:bg-gray-800 p-2 border-full rounded">
-            Add Product
-        </Link>
+
+
 
     </div>
-</div>
+
+
+
+    <!-- ================================= -->
+    <!-- Navigation -->
+    <!-- ================================= -->
+
+    <nav class="flex-1  px-4 py-5 text-gray-700 overflow-y-auto">
+
+       
 
         <Link
-            href="/admin/orders"
-            class="flex items-center justify-between p-2 rounded hover:bg-gray-800"
+            href="/admin/dashboard"
+            :class="[
+                'flex items-center justify-between px-3 py-3 rounded-xl transition font-bold mb-1',
+                $page.url.startsWith('/admin/dashboard')
+                    ? 'bg-blue-600 text-white shadow-xl'
+                    : 'hover:bg-white'
+            ]"
         >
 
             <div class="flex items-center gap-3">
-                <ShoppingCart size="18" />
-                <span>Orders</span>
+                <LayoutDashboard size="21" class="font-bold" />
+                <span v-if="!collapsed">Dashboard</span>
+            </div>
+
+            <ChevronRight size="18"/>
+
+        </Link>
+
+
+
+        <!-- USERS -->
+
+        <Link
+            href="/admin/users"
+            :class="[
+                'flex items-center justify-between px-3 py-3 rounded-xl transition font-bold mb-1',
+                $page.url.startsWith('/admin/users')
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'hover:bg-white'
+            ]"
+        >
+
+            <div class="flex items-center gap-3  ">
+                <Users size="21" class="font-bold"/>
+                <span v-if="!collapsed">Customers</span>
+            </div>
+
+            <ChevronRight size="16"/>
+
+        </Link>
+
+
+
+      
+
+        <Link
+            href="/admin/categories"
+            :class="[
+                'flex items-center justify-between px-3 py-3 rounded-xl transition font-bold mb-1',
+                $page.url.startsWith('/admin/categories')
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'hover:bg-white'
+            ]"
+        >
+
+            <div class="flex items-center gap-3">
+                <Folder size="21" class="font-bold"/>
+                <span v-if="!collapsed">Categories</span>
+            </div>
+
+            <ChevronRight size="18"/>
+
+        </Link>
+
+
+
+        <Link
+            href="/admin/brands"
+            :class="[
+                'flex items-center justify-between px-3 py-3 rounded-xl transition font-bold mb-1',
+                $page.url.startsWith('/admin/brands')
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'hover:bg-white'
+            ]"
+        >
+
+            <div class="flex items-center gap-3">
+                <Tags size="21" class="font-bold"/>
+                <span v-if="!collapsed">Brands</span>
+            </div>
+
+            <ChevronRight size="18"/>
+
+        </Link>
+
+
+
+        <!-- PRODUCTS -->
+
+        <button
+            @click="openProducts = !openProducts"
+            class="w-full flex items-center justify-between px-3 py-3 rounded-xl hover:bg-white/30 transition"
+        >
+
+            <div class="flex items-center font-bold gap-3">
+
+                <ShoppingBag size="21" class="font-bold"/>
+
+                <span v-if="!collapsed">Products</span>
+
+                <span
+                    v-if="lowStockCount && !collapsed"
+                    class="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs"
+                >
+                    {{ lowStockCount }}
+                </span>
+
+            </div>
+
+            <ChevronDown
+            v-if="!collapsed"
+                size="21"
+                class="transition"
+                :class="{ 'rotate-180': openProducts }"
+            />
+
+        </button>
+
+
+        <div
+            v-if="openProducts"
+            class="ml-10 mt-2 space-y-2"
+        >
+
+            <Link
+                href="/admin/products"
+                class="block py-2 px-3 rounded-lg text-sm hover:bg-white/30"
+            >
+                All Products
+            </Link>
+
+            <Link
+                href="/admin/products/create"
+                class="block py-2 px-3 rounded-lg text-sm hover:bg-white/30"
+            >
+                Add Product
+            </Link>
+
+        </div>
+
+
+
+       
+
+
+        <Link
+            href="/admin/orders"
+            :class="[
+                'flex items-center justify-between px-3 py-3 rounded-xl font-bold transition',
+                $page.url.startsWith('/admin/orders')
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'hover:bg-white'
+            ]"
+        >
+
+            <div class="flex items-center gap-3">
+
+                <ShoppingCart size="21" class="font-bold"/>
+
+                <span v-if="!collapsed">Orders</span>
+
             </div>
 
             <span
-                v-if="pendingOrdersCount > 0"
-                class="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full"
+                v-if="pendingOrdersCount && !collapsed"
+                class="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs"
             >
                 {{ pendingOrdersCount }}
             </span>
 
         </Link>
 
-
-               
-
-
-
-            </nav>
+    </nav>
 
 
 
-     
+    <!-- ================================= -->
+    <!-- User -->
+    <!-- ================================= -->
 
- <!-- Bottom Section -->
-    <div class="p-4 border-t border-gray-700">
+    <div class=" border-t-2 border-gray-100">
 
-        <!-- User Info -->
-        <div class="flex items-center gap-3 mb-3">
-            <UserCircle size="22" />
-            <span class="text-sm font-medium">
-                {{ user.name }}
-            </span>
+        <div class="flex flex-col  bg-white/20 rounded-xl p-4 gap-2">
+
+            <div class="flex items-center gap-3 mb-2">
+
+                <UserCircle
+                    class="text-gray-600"
+                    size="30"
+                />
+
+                <div>
+
+                    <p 
+                    v-if="!collapsed"
+                    class="font-semibold text-gray-800">
+                        {{ user.name }}
+                    </p>
+
+                    <p 
+                    v-if="!collapsed"
+                    class="text-xs text-gray-500">
+                        Administrator
+                    </p>
+
+                </div>
+
+            </div>
+
+            <Link
+                href="/logout"
+                method="post"
+                as="button"
+                class="w-full flex  gap-2 text-red-600 px-1  rounded-lg transition"
+            >
+
+                <LogOut size="21"/>
+
+               <span v-if="!collapsed">Logout</span>
+
+            </Link>
+
         </div>
-
-        <!-- Logout -->
-        <Link href="/logout"
-              method="post"
-              as="button"
-              class="flex items-center gap-2 text-red-400 hover:text-red-600">
-
-            <LogOut size="18" />
-            Logout
-
-        </Link>
 
     </div>
 
+</aside>
 
 
-
-
-        </aside>
 
         <!-- Main Area -->
         <div class="flex-1 flex flex-col">
 
             <!-- Top Navbar -->
-<header class="bg-white shadow px-6 py-4 flex justify-between items-center">
+<header class="bg-white/15 backdrop-blur-xl border-1 shadow px-6 py-4 flex justify-between items-center rounded-xl  border">
 
-    <h1 class="text-lg font-semibold text-gray-700">
-        Admin Dashboard
-    </h1>
+<div class="flex items-center gap-4">
+
+    <button
+     v-if="showBackButton"
+        @click="goBack"
+        class="p-2 rounded-xl hover:bg-white/40 transition"
+    >
+        <ArrowLeft class="w-5 h-5 text-gray-700" />
+    </button>
+
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">
+            {{ title }}
+        </h1>
+
+        <p class="text-sm text-gray-500">
+            {{ subtitle }}
+        </p>
+    </div>
+
+</div>
+
+
+<!-- Search -->
+
+<div class="hidden lg:block w-96">
+    <div class="relative">
+
+        <!-- Search Icon -->
+        <Search
+            class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            :size="18"
+        />
+
+        <!-- Input -->
+        <input
+            type="text"
+            placeholder="Search products, orders, customers..."
+            class="w-full
+                   pl-11 pr-4 py-2.5
+                   rounded-xl
+                   bg-white
+                   text-gray-700
+                   placeholder:text-gray-400
+                   border border-gray-200
+                   shadow-sm
+                   focus:outline-none
+                   focus:ring-2
+                   focus:ring-blue-500
+                   focus:border-blue-500
+                   transition-all"
+        />
+
+    </div>
+</div>
+
+
+
+
 
     <!-- Right Section -->
     <div class="flex items-center gap-4">
 
         <!-- Notification Icon -->
-        <div class="relative cursor-pointer">
-            <Bell class="text-gray-600 hover:text-gray-800" size="27" />
+   
+<div class="relative">
 
-            <!-- Notification Badge -->
+    <!-- Bell Button -->
+    <button
+        @click="showNotifications = !showNotifications"
+        class="relative"
+    >
+
+        <Bell
+            class="text-gray-600 hover:text-gray-800"
+            size="27"
+        />
+
+        <!-- Badge -->
         <span
-            v-if="pendingOrdersCount > 0"
+            v-if="unreadNotificationsCount > 0"
             class="absolute -top-1 -right-1 bg-red-500 text-white text-xs
-                w-5 h-5 flex items-center justify-center rounded-full"
+                   w-5 h-5 flex items-center justify-center rounded-full"
         >
-            {{ pendingOrdersCount }}
+            {{ unreadNotificationsCount }}
         </span>
+
+    </button>
+
+    <!-- Dropdown -->
+    <div
+        v-if="showNotifications"
+        class="absolute right-0 mt-3 w-96 bg-white rounded-2xl
+               shadow-xl border z-50 overflow-hidden"
+    >
+
+        <!-- Header -->
+        <div class="p-4 border-b">
+
+            <h3 class="font-semibold text-gray-800">
+                Notifications
+            </h3>
+
         </div>
 
-        <!-- User Name -->
-        <span class="font-medium text-gray-700">
-            Welcome, {{ user.name }}
-        </span>
+        <!-- Notifications -->
+        <div
+            v-if="notifications.length"
+            class="max-h-96 overflow-y-auto"
+        >
+
+            <Link
+                v-for="notification in notifications"
+                :key="notification.id"
+                :href="`/admin/notifications/${notification.id}/read`"
+                 method="patch"
+                 as="button"
+                 class="block w-full text-left p-4 border-b hover:bg-gray-50 transition"
+            >
+
+                <div class="flex justify-between items-start">
+
+                    <div>
+
+                        <p class="font-medium text-gray-800">
+                            {{ notification.title }}
+                        </p>
+
+                        <p class="text-sm text-gray-500 mt-1">
+                            {{ notification.message }}
+                        </p>
+
+                    </div>
+
+                    <!-- unread indicator -->
+                    <span
+                        v-if="!notification.is_read"
+                        class="w-2 h-2 rounded-full bg-blue-500 mt-2"
+                    ></span>
+
+                </div>
+
+                <p class="text-xs text-gray-400 mt-2">
+                    {{ new Date(notification.created_at)
+                        .toLocaleString() }}
+                </p>
+
+            </Link>
+
+        </div>
+
+        <!-- Empty state -->
+        <div
+            v-else
+            class="p-6 text-center text-gray-500"
+        >
+            No notifications
+        </div>
+
+    </div>
+
+</div>
+
+<!-- User Profile -->
+<div class="flex items-center gap-3">
+
+    <!-- Avatar -->
+    <div
+        class="w-10 h-10 rounded-full
+               bg-gradient-to-br from-blue-500 to-indigo-600
+               text-white
+               flex items-center justify-center
+               font-semibold
+               shadow-md"
+    >
+        {{ user.name.charAt(0).toUpperCase() }}
+    </div>
+
+  
+
+</div>
+       
 
     </div>
 
@@ -211,7 +547,7 @@ import { ref } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 import { watch } from 'vue'
 import { usePage } from '@inertiajs/vue3'
-
+import logo from '@/Assets/Images/logo4test.png'
 import {
     LayoutDashboard,
     Folder,
@@ -222,17 +558,57 @@ import {
     LogOut,
     Settings,
     Bell,
-    Users
+    Users,
+    PanelLeft,
+    PanelRight,
+    ArrowLeft,
+    Search
 } from 'lucide-vue-next'
 
+
+const goBack = () => {
+    window.history.back()
+}
 
 const page = usePage()
 const show = ref(false)
 const user = page.props.auth.user
 const openProducts = ref(false)
+const collapsed = ref(false)
 
 const pendingOrdersCount =
     page.props.admin.pendingOrdersCount
+
+const notifications =
+    page.props.admin.notifications || []
+
+const unreadNotificationsCount =
+    page.props.admin.unreadNotificationsCount || 0
+
+const lowStockCount =
+    page.props.admin.lowStockCount || 0
+
+const showNotifications = ref(false)
+
+const props = defineProps({
+    title: {
+        type: String,
+        default: 'Dashboard'
+    },
+
+    subtitle: {
+        type: String,
+        default: ''
+    },
+
+    showBackButton: {
+        type: Boolean,
+        default: true,
+    },
+
+})
+
+
 
 
 watch(

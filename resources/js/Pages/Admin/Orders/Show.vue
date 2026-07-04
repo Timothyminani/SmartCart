@@ -86,7 +86,10 @@ const paymentStatusClass = (status) => {
 <template>
     <Head :title="`Order #${order.id}`" />
 
-    <AdminLayout>
+    <AdminLayout
+    title="Orders"
+    subtitle="Track and manage customer orders"
+    >
 
         <!-- Header -->
         <div class="mb-8">

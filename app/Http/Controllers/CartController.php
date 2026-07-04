@@ -11,34 +11,60 @@ use Illuminate\Http\Request;
 class CartController extends Controller
 {
     // ---------------- ADD ----------------
-    public function add(Request $request)
-    {
-        $request->validate([
-            'product_id' => 'required|exists:products,id'
-        ]);
+   public function add(Request $request)
+{
+    $request->validate([
+        'product_id' => 'required|exists:products,id'
+    ]);
 
-        $cart = Cart::firstOrCreate([
-            'user_id' => auth()->id()
-        ]);
+    $product = Product::findOrFail(
+        $request->product_id
+    );
 
-        $item = $cart->items()
-            ->where('product_id', $request->product_id)
-            ->first();
+    // OUT OF STOCK
+    if ($product->stock_quantity <= 0) {
 
-        if ($item) {
-            $item->increment('quantity');
-        } else {
-            $product = Product::findOrFail($request->product_id);
+        return response()->json([
+            'success' => false,
+            'message' => 'This product is out of stock.'
+        ], 422);
+    }
 
-            $cart->items()->create([
-                'product_id' => $product->id,
-                'quantity' => 1,
-                'price' => $product->price
-            ]);
+    $cart = Cart::firstOrCreate([
+        'user_id' => auth()->id()
+    ]);
+
+    $item = $cart->items()
+        ->where('product_id', $product->id)
+        ->first();
+
+    // PRODUCT ALREADY EXISTS IN CART
+    if ($item) {
+
+        // Prevent exceeding stock
+        if ($item->quantity >= $product->stock_quantity) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Only '.$product->stock_quantity.' items available.'
+            ], 422);
         }
 
-        return response()->json(['success' => true]);
+        $item->increment('quantity');
+
+    } else {
+
+        $cart->items()->create([
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => $product->price
+        ]);
     }
+
+    return response()->json([
+        'success' => true
+    ]);
+}
 
     // ---------------- UPDATE ----------------
     public function update(Request $request)
@@ -54,12 +80,23 @@ class CartController extends Controller
             })
             ->firstOrFail();
 
-        $item->update([
-            'quantity' => $request->quantity
-        ]);
+       $product = $item->product;
+
+if ($request->quantity > $product->stock_quantity) {
+
+    return response()->json([
+        'success' => false,
+        'message' => 'Only '.$product->stock_quantity.' items available.'
+    ], 422);
+}
+
+$item->update([
+    'quantity' => $request->quantity
+]);
 
         return response()->json(['success' => true]);
     }
+
 
     // ---------------- GET CART ----------------
     public function getCart()

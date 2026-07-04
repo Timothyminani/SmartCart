@@ -15,29 +15,66 @@ use Illuminate\Support\Str;
 class ProductController extends Controller
 {
 
-   public function index(Request $request)
+  public function index(Request $request)
 {
     $query = Product::with(['category', 'brand', 'images']);
 
-    // 🔍 Search
-    if ($request->search) {
+    // Search
+    if ($request->filled('search')) {
         $query->where('name', 'like', '%' . $request->search . '%');
     }
 
-    // 📂 Filter by category
-    if ($request->category) {
+    // Category
+    if ($request->filled('category')) {
         $query->where('category_id', $request->category);
     }
 
-    // 📄 Pagination
-    $products = $query->latest()->paginate(10)->withQueryString();
+    // Brand
+    if ($request->filled('brand')) {
+        $query->where('brand_id', $request->brand);
+    }
+
+    // Stock
+    if ($request->filled('stock')) {
+
+        switch ($request->stock) {
+
+            case 'in':
+                $query->where('stock_quantity', '>', 5);
+                break;
+
+            case 'low':
+                $query->whereBetween('stock_quantity', [1, 5]);
+                break;
+
+            case 'out':
+                $query->where('stock_quantity', 0);
+                break;
+        }
+    }
+
+  
+
+    $products = $query
+        ->latest()
+        ->paginate(10)
+        ->withQueryString();
 
     return Inertia::render('Admin/Products/Index', [
         'products' => $products,
-        'filters' => $request->only(['search', 'category']),
-        'categories' => \App\Models\Category::all()
+
+        'filters' => $request->only([
+            'search',
+            'category',
+            'brand',
+            'stock',
+        ]),
+
+        'categories' => Category::all(),
+        'brands' => Brand::all(),
     ]);
 }
+
 
 
 

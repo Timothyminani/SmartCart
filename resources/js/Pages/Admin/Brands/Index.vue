@@ -1,5 +1,8 @@
 <template>
-    <AdminLayout>
+    <AdminLayout
+    title="Brands"
+    subtitle="Manage all brands in your store"
+    >
 
         <div class="flex justify-between mb-6">
             <h1 class="text-2xl font-bold">Brands</h1>

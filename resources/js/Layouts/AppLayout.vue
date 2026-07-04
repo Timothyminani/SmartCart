@@ -738,7 +738,7 @@
 
 
 
-<!-- Compare Message -->
+
 
 <!-- COMPARE MESSAGE -->
 <transition name="fade">
@@ -751,6 +751,26 @@
   </div>
 
 </transition>
+
+<!-- Cart Message -->
+
+<Transition
+    enter-active-class="transition duration-300"
+    enter-from-class="opacity-0 translate-y-3"
+    enter-to-class="opacity-100 translate-y-0"
+    leave-active-class="transition duration-300"
+    leave-from-class="opacity-100 translate-y-0"
+    leave-to-class="opacity-0 translate-y-3"
+>
+    <div
+        v-if="cartMessage"
+        class="fixed bottom-6 left-1/2 -translate-x-1/2
+               bg-red-500 text-white px-6 py-3 rounded-xl
+               shadow-lg z-50"
+    >
+        {{ cartMessage }}
+    </div>
+</Transition>
 
 
 </template>
@@ -798,6 +818,8 @@ const handleScroll = () => {
   showTopBar.value = window.scrollY <= 50
 }
 
+
+
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
   if (headerRef.value) {
@@ -840,6 +862,7 @@ const {
   decreaseQty,
   removeItem,
   getCartRecommendations,
+  cartMessage
 } = useCart()
 
 const loadRecommendations = async () => {
@@ -930,15 +953,17 @@ const grandTotal = computed(() => {
 
 // CART HANDLERS
 const handleIncrease = async (item) => {
-  // ⚡ instant UI update
-  item.quantity++
 
-  try {
-    await increaseQty(item.product_id)
-  } catch (error) {
-    
-    item.quantity--
-  }
+    // Instant UI update
+    item.quantity++
+
+    const success = await increaseQty(item.product_id)
+
+    // Rollback if request failed
+    if (!success) {
+        item.quantity--
+    }
+
 }
 
 const handleDecrease = async (item) => {

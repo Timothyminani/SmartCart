@@ -1,7 +1,10 @@
 <template>
-    <AdminLayout>
+    <AdminLayout
+    title="Products"
+    :subtitle="isEdit ? 'Edit Product' : 'Create Product'"
+    >
 
-        <h1 class="text-2xl font-bold mb-6">  {{ isEdit ? 'Edit Product' : 'Create Product' }}</h1>
+        <h1 class="text-2xl font-bold mb-6">  </h1>
 
         <div class="bg-white p-6 rounded-xl shadow">
               <!-- FORM -->

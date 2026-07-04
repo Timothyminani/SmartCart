@@ -1,9 +1,12 @@
 <template>
-    <AdminLayout>
+    <AdminLayout
+    title="Products"
+    subtitle="Manage all products in your store"
+    >
 
         <!-- HEADER -->
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold">Products</h1>
+        <div class="flex justify-end items-center mb-6">
+            
 
             <Link 
                 href="/admin/products/create"
@@ -14,46 +17,77 @@
         </div>
 
         <!-- FILTER BAR -->
-        <div class="flex flex-col md:flex-row gap-4 mb-4 justify-between">
+<div class="flex justify-center gap-4 mb-6 items-center p-3 bg-white rounded-xl shadow">
 
-            <!-- Search -->
-           <div class="relative w-full md:w-64">
+    <!-- Search -->
+    <div class="relative w-full md:w-64">
 
-    <!-- Icon -->
-    <Search 
-        class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" 
-        size="18"
-        color="black"
-    />
+        <Search
+            class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            size="18"
+        />
 
-    <!-- Input -->
-    <input
-        v-model="search"
-        @input="applyFilters"
-        type="text"
-        placeholder="Search products..."
-        class="border pl-10 pr-3 py-2 rounded-lg w-full"
-    />
+        <input
+            v-model="search"
+            @input="applyFilters"
+            type="text"
+            placeholder="Search products..."
+            class="border pl-10 pr-3 py-2 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        />
 
+    </div>
+
+    <!-- Category -->
+    <select
+        v-model="category"
+        @change="applyFilters"
+        class="border px-3 py-2 rounded-lg w-full md:w-48"
+    >
+        <option value="">All Categories</option>
+
+        <option
+            v-for="cat in categories"
+            :key="cat.id"
+            :value="cat.id"
+        >
+            {{ cat.name }}
+        </option>
+
+    </select>
+
+    <!-- Brand -->
+    <select
+        v-model="brand"
+        @change="applyFilters"
+        class="border px-3 py-2 rounded-lg w-full md:w-48"
+    >
+        <option value="">All Brands</option>
+
+        <option
+            v-for="brandItem in brands"
+            :key="brandItem.id"
+            :value="brandItem.id"
+        >
+            {{ brandItem.name }}
+        </option>
+
+    </select>
+
+    <!-- Stock -->
+    <select
+        v-model="stock"
+        @change="applyFilters"
+        class="border px-3 py-2 rounded-lg w-full md:w-48"
+    >
+        <option value="">All Stock</option>
+        <option value="in">In Stock</option>
+        <option value="low">Low Stock</option>
+        <option value="out">Out of Stock</option>
+    </select>
+
+   
+    
 </div>
-
-            <!-- Category Filter -->
-            <select
-                v-model="category"
-                @change="applyFilters"
-                class="border px-3 py-2 rounded-lg w-full md:w-48"
-            >
-                <option value="">All Categories</option>
-                <option 
-                    v-for="cat in categories" 
-                    :key="cat.id" 
-                    :value="cat.id"
-                >
-                    {{ cat.name }}
-                </option>
-            </select>
-
-        </div>
 
         <!-- TABLE -->
         <div class="bg-white p-6 rounded-xl shadow">
@@ -222,21 +256,28 @@ const form = useForm({})
 const props = defineProps({
     products: Object,
     filters: Object,
-    categories: Array
+    categories: Array,
+    brands: Array
 })
 
 // Filters state
 const search = ref(props.filters.search || '')
 const category = ref(props.filters.category || '')
+const brand = ref(props.filters.brand || '')
+const stock = ref(props.filters.stock || '')
+
+
 
 // Apply filters
 const applyFilters = () => {
-    router.get('/admin/products', {
+    router.get(route('admin.products.index'), {
         search: search.value,
-        category: category.value
+        category: category.value,
+        brand: brand.value,
+        stock: stock.value,
     }, {
         preserveState: true,
-        replace: true
+        replace: true,
     })
 }
 

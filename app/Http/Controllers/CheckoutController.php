@@ -10,6 +10,8 @@ use App\Models\Payment;
 use App\Mail\OrderPlacedMail;
 use App\Mail\NewOrderAdminMail;
 use Illuminate\Support\Facades\Mail;
+use App\Models\AdminNotification;
+use Illuminate\Support\Facades\DB;
 
 class CheckoutController extends Controller
 {
@@ -49,6 +51,26 @@ public function store(Request $request)
 
     $total = $subtotal + $deliveryFee;
 
+/*
+|--------------------------------------------------------------------------
+| STOCK VALIDATION
+|--------------------------------------------------------------------------
+*/
+
+foreach ($cart->items as $item) {
+
+    $product = $item->product;
+
+    if ($item->quantity > $product->stock_quantity) {
+
+        return response()->json([
+            'error' => "{$product->name} only has {$product->stock_quantity} item(s) left in stock."
+        ], 422);
+
+    }
+}
+
+
     /*
     |--------------------------------------------------------------------------
     | CASH ON DELIVERY
@@ -70,16 +92,38 @@ public function store(Request $request)
         ]);
 
         foreach ($cart->items as $item) {
+
             OrderItem::create([
-                'order_id' => $order->id,
+                'order_id'   => $order->id,
                 'product_id' => $item->product_id,
-                'quantity' => $item->quantity,
-                'price' => $item->price,
+                'quantity'   => $item->quantity,
+                'price'      => $item->price,
             ]);
+
+            // Reduce stock
+            $item->product->decrement(
+                'stock_quantity',
+                $item->quantity
+            );
         }
 
                 // Load relationships for email
         $order->load('user', 'items.product');
+
+        // Notifications 
+        AdminNotification::create([
+            'title' => 'New Order Received',
+
+            'message' => auth()->user()->name .
+                ' placed order #' . $order->id .
+                ' worth KES ' . number_format($order->total_amount),
+
+            'type' => 'order',
+
+            'url' => '/admin/orders/' . $order->id
+        ]);
+
+
 
         // Customer email
         Mail::to($order->user->email)
@@ -123,12 +167,17 @@ $order = Order::create([
 foreach ($cart->items as $item) {
 
     OrderItem::create([
-        'order_id' => $order->id,
+        'order_id'   => $order->id,
         'product_id' => $item->product_id,
-        'quantity' => $item->quantity,
-        'price' => $item->price,
+        'quantity'   => $item->quantity,
+        'price'      => $item->price,
     ]);
 
+    // Reduce stock
+    $item->product->decrement(
+        'stock_quantity',
+        $item->quantity
+    );
 }
 
 
@@ -150,6 +199,20 @@ $payment = Payment::create([
 
 // Load relationships
 $order->load('user', 'items.product');
+
+// Notification
+AdminNotification::create([
+    'title' => 'New Order Received',
+
+    'message' => auth()->user()->name .
+        ' placed order #' . $order->id .
+        ' worth KES ' . number_format($order->total_amount),
+
+    'type' => 'order',
+
+    'url' => '/admin/orders/' . $order->id
+]);
+
 
 // Customer email
   Mail::to($order->user->email)

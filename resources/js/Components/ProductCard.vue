@@ -94,8 +94,15 @@
 <div>
 
   <!-- 🟢 NOT IN CART -->
+
+  <div
+    v-if="product.stock_quantity <= 0"
+    class="w-full bg-red-100 text-red-600 text-center py-2 rounded-lg font-medium"
+>
+    Out of Stock
+</div>
   <button
-    v-if="!cartItem"
+    v-else-if="!cartItem"
     @click="handleAdd"
     class="w-full flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg transition"
   >
@@ -147,6 +154,8 @@
 
 </div>
 
+
+
       </div>
 
     </div>
@@ -176,7 +185,7 @@ const props = defineProps({
   compact: Boolean
 })
 
-
+const errorMessage = ref('')
 
 
 // ✅ 2. useCart AFTER props
@@ -195,29 +204,45 @@ const cartItem = ref(null)
 
 // ✅ 5. handlers
 const handleAdd = async () => {
+
   loading.value = true
+  errorMessage.value = ''
 
-  await addToCart(props.product.id)
+  try {
 
-  // ⚡ instant UI update
-cartItem.value = await getCartItem(props.product.id)
+    await addToCart(props.product.id)
 
-  loading.value = false
+    cartItem.value = await getCartItem(props.product.id)
+
+  } catch (error) {
+
+    errorMessage.value =
+      error.response?.data?.message ||
+      'Something went wrong'
+
+  } finally {
+
+    loading.value = false
+
+  }
+
 }
 
 
 
 const handleIncrease = async () => {
-  loading.value = true
 
-  await increaseQty(props.product.id)
+    loading.value = true
 
-  // ⚡ instant update
-  cartItem.value.quantity++
+    const success =
+        await increaseQty(props.product.id)
 
-  loading.value = false
+    if (success) {
+        cartItem.value.quantity++
+    }
+
+    loading.value = false
 }
-
 
 
 

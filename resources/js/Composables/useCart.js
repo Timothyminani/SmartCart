@@ -1,5 +1,9 @@
 import { usePage } from '@inertiajs/vue3'
 import axios from 'axios'
+import { ref } from 'vue'
+
+ const cartMessage = ref('')
+
 
 export const useCart = () => {
 
@@ -25,26 +29,58 @@ export const useCart = () => {
 
   // ---------------- ADD ----------------
   const addToCart = async (productId) => {
+
     if (!isLoggedIn()) {
-      window.location.href = '/login'
-      return
+        window.location.href = '/login'
+        return false
     }
 
-    await axios.post('/cart/add', {
-      product_id: productId
-    })
+    try {
 
-    window.dispatchEvent(new Event('cartUpdated'))
-  }
+        await axios.post('/cart/add', {
+            product_id: productId
+        })
+
+        window.dispatchEvent(new Event('cartUpdated'))
+
+        return true
+
+    } catch (error) {
+
+        showMessage(
+            error.response?.data?.message ||
+            'Something went wrong'
+        )
+
+        return false
+    }
+}
+
 
   // ---------------- INCREASE ----------------
-  const increaseQty = async (productId) => {
-    await axios.post('/cart/add', {
-      product_id: productId
-    })
+ const increaseQty = async (productId) => {
 
-    window.dispatchEvent(new Event('cartUpdated'))
-  }
+    try {
+
+        await axios.post('/cart/add', {
+            product_id: productId
+        })
+
+        window.dispatchEvent(new Event('cartUpdated'))
+
+        return true
+
+    } catch (error) {
+
+        showMessage(
+            error.response?.data?.message ||
+            'Something went wrong'
+        )
+
+        return false
+    }
+
+}
 
   // ---------------- DECREASE ----------------
   const decreaseQty = async (itemId, quantity) => {
@@ -106,6 +142,16 @@ const getCartRecommendations = async () => {
 
 
 
+const showMessage = (message) => {
+
+    cartMessage.value = message
+
+    setTimeout(() => {
+        cartMessage.value = ''
+    }, 3000)
+}
+
+
 
 
   return {
@@ -117,6 +163,8 @@ const getCartRecommendations = async () => {
     getCartCount,
     removeItem,
     getCartRecommendations,
-    getCartTotal
+    getCartTotal,
+    showMessage,
+    cartMessage
   }
 }

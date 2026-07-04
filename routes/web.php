@@ -19,6 +19,9 @@ use App\Http\Controllers\AiSearchController;
 use App\Http\Controllers\Admin\AdminOrderController;
 use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\Admin\AdminNotificationController;
+use App\Http\Controllers\Admin\AdminDashboardController;
+
 // Customize Routes
 
 
@@ -66,6 +69,10 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::patch('/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])
             ->name('admin.orders.update-status');
             
+      Route::patch(
+    '/notifications/{notification}/read',
+    [AdminNotificationController::class, 'markAsRead']
+)->name('admin.notifications.read');      
 
 });
 
@@ -161,9 +168,9 @@ Route::get('/', function () {
 
 
 
-Route::get('/admin/dashboard', function () {
-    return Inertia::render('Admin/Dashboard');
-})->middleware(['auth', 'admin']);
+Route::get('/admin/dashboard', [AdminDashboardController::class, 'index'])
+    ->middleware(['auth', 'admin'])
+    ->name('admin.dashboard');
 
 Route::get('/dashboard', function () {
     return redirect('/');

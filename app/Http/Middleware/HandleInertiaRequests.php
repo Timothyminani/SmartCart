@@ -5,6 +5,8 @@ namespace App\Http\Middleware;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use App\Models\Order;
+use App\Models\AdminNotification;
+use App\Models\Product;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -41,12 +43,34 @@ class HandleInertiaRequests extends Middleware
             'error' => fn () => $request->session()->get('error'),
         ],
 
-         'admin' => [
+        
+        'admin' => [
+
             'pendingOrdersCount' => auth()->check()
                 ? Order::where('status', 'pending')->count()
                 : 0,
+
+            'notifications' => auth()->check()
+                ? AdminNotification::latest()
+                    ->take(5)
+                    ->get()
+                : [],
+
+            'unreadNotificationsCount' => auth()->check()
+                ? AdminNotification::where('is_read', false)
+                    ->count()
+                : 0,
+
+            'lowStockCount' => auth()->check()
+                ? Product::where('stock_quantity', '<=', 5)
+                    ->where('stock_quantity', '>', 0)
+                    ->count()
+                : 0,
+
         ],
 
+
+        
         
         ];
     }

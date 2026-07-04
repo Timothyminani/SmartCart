@@ -44,7 +44,10 @@ const formatCurrency = (amount) => {
 <template>
     <Head title="Orders" />
 
-    <AdminLayout>
+    <AdminLayout
+    title="Orders"
+    subtitle="Track and manage customer orders"
+    >
 
         <!-- Page Header -->
         <div class="mb-8">
