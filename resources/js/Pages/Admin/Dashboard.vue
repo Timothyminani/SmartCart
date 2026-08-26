@@ -19,7 +19,7 @@
         </div>
 
         <!-- Overview Cards -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-8">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-8 ">
 
     <StatCard
         title="Total Products"

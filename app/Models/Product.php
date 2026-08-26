@@ -1,8 +1,9 @@
 <?php
 
 namespace App\Models;
-
+use App\Models\Review;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
@@ -48,6 +49,11 @@ public function images()
 public function cartItems()
 {
     return $this->hasMany(CartItem::class);
+}
+
+public function reviews(): HasMany
+{
+    return $this->hasMany(Review::class);
 }
 
 }

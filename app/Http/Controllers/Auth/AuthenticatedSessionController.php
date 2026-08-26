@@ -16,13 +16,39 @@ class AuthenticatedSessionController extends Controller
     /**
      * Display the login view.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        /*
+        |--------------------------------------------------------------------------
+        | SAVE RETURN URL
+        |--------------------------------------------------------------------------
+        |
+        | Example:
+        | /login?redirect=/products/lenovo-yoga...
+        |
+        | We save that product URL in Laravel's normal "intended" session.
+        |
+        */
+
+        $redirect = $request->query('redirect');
+
+        if (
+            $redirect &&
+            str_starts_with($redirect, '/') &&
+            !str_starts_with($redirect, '//')
+        ) {
+            $request->session()->put(
+                'url.intended',
+                $redirect
+            );
+        }
+
         return Inertia::render('Auth/Login', [
             'canResetPassword' => Route::has('password.request'),
             'status' => session('status'),
         ]);
     }
+
 
     /**
      * Handle an incoming authentication request.
@@ -32,15 +58,36 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
-   
-       if (auth()->user()->role === 'admin') {
-        return redirect()->intended('/admin/dashboard');
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN
+        |--------------------------------------------------------------------------
+        */
+
+        if (auth()->user()->role === 'admin') {
+            return redirect('/admin/dashboard');
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CUSTOMER
+        |--------------------------------------------------------------------------
+        |
+        | Laravel reads session('url.intended').
+        |
+        | If it exists:
+        |     /products/lenovo-yoga...
+        |
+        | If it doesn't:
+        |     /
+        |
+        */
+
+        return redirect()->intended('/');
     }
 
-    return redirect()->intended('/'); 
-
-
-    }
 
     /**
      * Destroy an authenticated session.

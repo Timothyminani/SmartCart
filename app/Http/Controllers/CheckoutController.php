@@ -2,240 +2,518 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use App\Models\AdminNotification;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
-use App\Mail\OrderPlacedMail;
-use App\Mail\NewOrderAdminMail;
-use Illuminate\Support\Facades\Mail;
-use App\Models\AdminNotification;
+use App\Models\Product;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class CheckoutController extends Controller
 {
-   
+    public function store(Request $request)
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | VALIDATION
+        |--------------------------------------------------------------------------
+        */
 
-public function store(Request $request)
-{
-    $request->validate([
-        'phone' => 'required|string|max:20',
-        'address' => 'required|string|max:255',
-        'delivery' => 'required|string',
-        'payment_method' => 'required|string'
-    ]);
+        $validated = $request->validate([
+            'phone' => [
+                'required',
+                'string',
+                'max:20',
+            ],
 
-    $cart = Cart::with('items.product')
-        ->where('user_id', auth()->id())
-        ->first();
+            'address' => [
+                'required',
+                'string',
+                'max:255',
+            ],
 
-    if (!$cart || $cart->items->isEmpty()) {
-        return response()->json([
-            'error' => 'Cart is empty'
-        ], 400);
-    }
+            'delivery' => [
+                'required',
+                Rule::in([
+                    'standard',
+                    'express',
+                    'pickup',
+                ]),
+            ],
 
-    // subtotal
-    $subtotal = $cart->items->sum(function ($item) {
-        return $item->price * $item->quantity;
-    });
-
-    // delivery fee
-    $deliveryFee = match ($request->delivery) {
-        'standard' => 250,
-        'express' => 500,
-        'pickup' => 0,
-        default => 0
-    };
-
-    $total = $subtotal + $deliveryFee;
-
-/*
-|--------------------------------------------------------------------------
-| STOCK VALIDATION
-|--------------------------------------------------------------------------
-*/
-
-foreach ($cart->items as $item) {
-
-    $product = $item->product;
-
-    if ($item->quantity > $product->stock_quantity) {
-
-        return response()->json([
-            'error' => "{$product->name} only has {$product->stock_quantity} item(s) left in stock."
-        ], 422);
-
-    }
-}
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CASH ON DELIVERY
-    |--------------------------------------------------------------------------
-    */
-
-    if ($request->payment_method === 'cod') {
-
-        $order = Order::create([
-            'user_id' => auth()->id(),
-            'total_amount' => $total,
-            'status' => 'pending',
-            'payment_status' => 'unpaid',
-            'phone' => $request->phone,
-            'address' => $request->address,
-            'delivery_method' => $request->delivery,
-            'delivery_fee' => $deliveryFee,
-            'payment_method' => 'cod'
+            'payment_method' => [
+                'required',
+                Rule::in([
+                    'cod',
+                    'mpesa',
+                ]),
+            ],
         ]);
 
-        foreach ($cart->items as $item) {
 
-            OrderItem::create([
-                'order_id'   => $order->id,
-                'product_id' => $item->product_id,
-                'quantity'   => $item->quantity,
-                'price'      => $item->price,
-            ]);
+        /*
+        |--------------------------------------------------------------------------
+        | CART
+        |--------------------------------------------------------------------------
+        */
 
-            // Reduce stock
-            $item->product->decrement(
-                'stock_quantity',
-                $item->quantity
-            );
+        $cart = Cart::with([
+            'items.product',
+        ])
+            ->where(
+                'user_id',
+                auth()->id()
+            )
+            ->first();
+
+
+        if (
+            !$cart ||
+            $cart->items->isEmpty()
+        ) {
+            return response()->json([
+                'error' => 'Cart is empty.',
+            ], 400);
         }
 
-                // Load relationships for email
-        $order->load('user', 'items.product');
 
-        // Notifications 
-        AdminNotification::create([
-            'title' => 'New Order Received',
+        /*
+        |--------------------------------------------------------------------------
+        | SUBTOTAL
+        |--------------------------------------------------------------------------
+        */
 
-            'message' => auth()->user()->name .
-                ' placed order #' . $order->id .
-                ' worth KES ' . number_format($order->total_amount),
-
-            'type' => 'order',
-
-            'url' => '/admin/orders/' . $order->id
-        ]);
-
+        $subtotal = $cart->items->sum(
+            function ($item) {
+                return
+                    $item->price *
+                    $item->quantity;
+            }
+        );
 
 
-        // Customer email
-        Mail::to($order->user->email)
-            ->queue(new OrderPlacedMail($order));
+        /*
+        |--------------------------------------------------------------------------
+        | DELIVERY FEE
+        |--------------------------------------------------------------------------
+        */
 
-            // Admin email
-        Mail::to('admin@smartcart.test')
-            ->queue(new NewOrderAdminMail($order));
+        $deliveryFee = match (
+            $validated['delivery']
+        ) {
+            'standard' => 250,
+            'express' => 500,
+            'pickup' => 0,
+        };
 
-       // 4. Clear Cart
-        $cart->items()->delete();
+
+        $total =
+            $subtotal +
+            $deliveryFee;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CASH ON DELIVERY
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $validated['payment_method'] === 'cod'
+        ) {
+            $order = DB::transaction(
+                function () use (
+                    $cart,
+                    $validated,
+                    $deliveryFee,
+                    $total
+                ) {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CREATE ORDER
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $order = Order::create([
+                        'user_id' =>
+                            auth()->id(),
+
+                        'total_amount' =>
+                            $total,
+
+                        'status' =>
+                            'pending',
+
+                        'payment_status' =>
+                            'unpaid',
+
+                        'phone' =>
+                            $validated['phone'],
+
+                        'address' =>
+                            $validated['address'],
+
+                        'delivery_method' =>
+                            $validated['delivery'],
+
+                        'delivery_fee' =>
+                            $deliveryFee,
+
+                        'payment_method' =>
+                            'cod',
+                    ]);
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CREATE ITEMS + LOCK STOCK
+                    |--------------------------------------------------------------------------
+                    */
+
+                    foreach (
+                        $cart->items as $item
+                    ) {
+                        /*
+                         * Lock the product row while this
+                         * transaction is processing it.
+                         *
+                         * This prevents two customers from
+                         * successfully buying the last unit
+                         * at exactly the same time.
+                         */
+
+                        $product = Product::query()
+                            ->whereKey(
+                                $item->product_id
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | STOCK VALIDATION
+                        |--------------------------------------------------------------------------
+                        */
+
+                        if (
+                            $item->quantity >
+                            $product->stock_quantity
+                        ) {
+                            abort(
+                                response()->json([
+                                    'error' =>
+                                        "{$product->name} only has {$product->stock_quantity} item(s) left in stock.",
+                                ], 422)
+                            );
+                        }
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | ORDER ITEM
+                        |--------------------------------------------------------------------------
+                        */
+
+                        OrderItem::create([
+                            'order_id' =>
+                                $order->id,
+
+                            'product_id' =>
+                                $product->id,
+
+                            'quantity' =>
+                                $item->quantity,
+
+                            'price' =>
+                                $item->price,
+                        ]);
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | REDUCE STOCK
+                        |--------------------------------------------------------------------------
+                        */
+
+                        $product->decrement(
+                            'stock_quantity',
+                            $item->quantity
+                        );
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | ADMIN NOTIFICATION
+                    |--------------------------------------------------------------------------
+                    */
+
+                    AdminNotification::create([
+                        'title' =>
+                            'New Order Received',
+
+                        'message' =>
+                            auth()->user()->name .
+                            ' placed order #' .
+                            $order->id .
+                            ' worth KES ' .
+                            number_format(
+                                $order->total_amount
+                            ),
+
+                        'type' =>
+                            'order',
+
+                        'url' =>
+                            '/admin/orders/' .
+                            $order->id,
+                    ]);
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CLEAR CART
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $cart
+                        ->items()
+                        ->delete();
+
+
+                    return $order;
+                }
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | LOAD RELATIONSHIPS
+            |--------------------------------------------------------------------------
+            */
+
+            $order->load([
+                'user',
+                'items.product',
+            ]);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | EMAILS - ENABLE LATER
+            |--------------------------------------------------------------------------
+            */
+
+            // Mail::to($order->user->email)
+            //     ->queue(
+            //         new OrderPlacedMail($order)
+            //     );
+
+            // Mail::to('admin@smartcart.test')
+            //     ->queue(
+            //         new NewOrderAdminMail($order)
+            //     );
+
+
+            return response()->json([
+                'type' =>
+                    'cod',
+
+                'order_id' =>
+                    $order->id,
+            ]);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | M-PESA
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        |
+        | At this point the customer has NOT paid.
+        |
+        | Therefore:
+        | - do not reduce stock here
+        | - do not clear the cart here
+        | - do not mark the order paid
+        |
+        | Those actions should happen only after
+        | M-Pesa confirms successful payment.
+        |
+        */
+
+        $result = DB::transaction(
+            function () use (
+                $cart,
+                $validated,
+                $deliveryFee,
+                $total
+            ) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | VALIDATE CURRENT STOCK
+                |--------------------------------------------------------------------------
+                |
+                | This confirms that checkout can begin.
+                |
+                | We still MUST check stock again after
+                | successful M-Pesa payment because stock
+                | is not being reserved here.
+                |
+                */
+
+                foreach (
+                    $cart->items as $item
+                ) {
+                    $product = Product::query()
+                        ->findOrFail(
+                            $item->product_id
+                        );
+
+
+                    if (
+                        $item->quantity >
+                        $product->stock_quantity
+                    ) {
+                        abort(
+                            response()->json([
+                                'error' =>
+                                    "{$product->name} only has {$product->stock_quantity} item(s) left in stock.",
+                            ], 422)
+                        );
+                    }
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE PENDING ORDER
+                |--------------------------------------------------------------------------
+                */
+
+                $order = Order::create([
+                    'user_id' =>
+                        auth()->id(),
+
+                    'total_amount' =>
+                        $total,
+
+                    'status' =>
+                        'pending',
+
+                    'payment_status' =>
+                        'pending',
+
+                    'phone' =>
+                        $validated['phone'],
+
+                    'address' =>
+                        $validated['address'],
+
+                    'delivery_method' =>
+                        $validated['delivery'],
+
+                    'delivery_fee' =>
+                        $deliveryFee,
+
+                    'payment_method' =>
+                        'mpesa',
+                ]);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE ORDER ITEMS
+                |--------------------------------------------------------------------------
+                */
+
+                foreach (
+                    $cart->items as $item
+                ) {
+                    OrderItem::create([
+                        'order_id' =>
+                            $order->id,
+
+                        'product_id' =>
+                            $item->product_id,
+
+                        'quantity' =>
+                            $item->quantity,
+
+                        'price' =>
+                            $item->price,
+                    ]);
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE PENDING PAYMENT
+                |--------------------------------------------------------------------------
+                */
+
+                $payment = Payment::create([
+                    'order_id' =>
+                        $order->id,
+
+                    'user_id' =>
+                        auth()->id(),
+
+                    'amount' =>
+                        $total,
+
+                    'phone' =>
+                        $validated['phone'],
+
+                    'status' =>
+                        'pending',
+
+                    'address' =>
+                        $validated['address'],
+
+                    'delivery_method' =>
+                        $validated['delivery'],
+
+                    'payment_method' =>
+                        'mpesa',
+                ]);
+
+
+                return [
+                    'order' =>
+                        $order,
+
+                    'payment' =>
+                        $payment,
+                ];
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSE
+        |--------------------------------------------------------------------------
+        */
 
         return response()->json([
-            'type' => 'cod',
-            'order_id' => $order->id
+            'type' =>
+                'mpesa',
+
+            'payment_id' =>
+                $result['payment']->id,
+
+            'order_id' =>
+                $result['order']->id,
         ]);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ONLINE PAYMENT (MPESA)
-    |--------------------------------------------------------------------------
-    */
-
-
-
-// 1. Create Order
-$order = Order::create([
-    'user_id' => auth()->id(),
-    'total_amount' => $total,
-    'status' => 'pending',
-    'payment_status' => 'pending',
-    'phone' => $request->phone,
-    'address' => $request->address,
-    'delivery_method' => $request->delivery,
-    'delivery_fee' => $deliveryFee,
-    'payment_method' => 'mpesa'
-]);
-
-// 2. Create Order Items
-foreach ($cart->items as $item) {
-
-    OrderItem::create([
-        'order_id'   => $order->id,
-        'product_id' => $item->product_id,
-        'quantity'   => $item->quantity,
-        'price'      => $item->price,
-    ]);
-
-    // Reduce stock
-    $item->product->decrement(
-        'stock_quantity',
-        $item->quantity
-    );
-}
-
-
-
-// 3. Create Payment
-$payment = Payment::create([
-    'order_id' => $order->id,
-    'user_id' => auth()->id(),
-    'amount' => $total,
-    'phone' => $request->phone,
-    'status' => 'pending',
-    'address' => $request->address,
-    'delivery_method' => $request->delivery,
-    'payment_method' => 'mpesa'   
-]);
-
-
-
-
-// Load relationships
-$order->load('user', 'items.product');
-
-// Notification
-AdminNotification::create([
-    'title' => 'New Order Received',
-
-    'message' => auth()->user()->name .
-        ' placed order #' . $order->id .
-        ' worth KES ' . number_format($order->total_amount),
-
-    'type' => 'order',
-
-    'url' => '/admin/orders/' . $order->id
-]);
-
-
-// Customer email
-  Mail::to($order->user->email)
-    ->queue(new OrderPlacedMail($order));
-
- // Admin email
- Mail::to('admin@smartcart.test')
-      ->queue(new NewOrderAdminMail($order));
-
-// 4. Clear Cart
-$cart->items()->delete();
-
-// 5. Redirect
-return response()->json([
-    'type' => 'mpesa',
-    'payment_id' => $payment->id
-]);
-}
-
-
-
-
-
-
-
 }

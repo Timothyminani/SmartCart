@@ -30,10 +30,25 @@ export const useCart = () => {
   // ---------------- ADD ----------------
   const addToCart = async (productId) => {
 
-    if (!isLoggedIn()) {
-        window.location.href = '/login'
-        return false
-    }
+   if (!isLoggedIn()) {
+
+    // Remember what product the user wanted to add
+    sessionStorage.setItem(
+        'pending_cart_product',
+        productId
+    )
+
+    // Remember where the user currently is
+    const currentUrl =
+        window.location.pathname +
+        window.location.search +
+        window.location.hash
+
+    window.location.href =
+        `/login?redirect=${encodeURIComponent(currentUrl)}`
+
+    return false
+}
 
     try {
 
@@ -152,10 +167,54 @@ const showMessage = (message) => {
 }
 
 
+const processPendingCart = async () => {
+
+    if (!isLoggedIn()) {
+        return false
+    }
+
+    const productId =
+        sessionStorage.getItem(
+            'pending_cart_product'
+        )
+
+    if (!productId) {
+        return false
+    }
+
+    try {
+
+        await axios.post('/cart/add', {
+            product_id: productId
+        })
+
+        // Only remove it after successfully adding
+        sessionStorage.removeItem(
+            'pending_cart_product'
+        )
+
+        window.dispatchEvent(
+            new Event('cartUpdated')
+        )
+
+        return true
+
+    } catch (error) {
+
+        showMessage(
+            error.response?.data?.message ||
+            'Could not add the product to your cart'
+        )
+
+        return false
+    }
+}
+
 
 
   return {
     addToCart,
+    processPendingCart,
     increaseQty,
     decreaseQty,
     getCart,

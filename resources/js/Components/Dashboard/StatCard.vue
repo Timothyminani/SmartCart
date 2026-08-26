@@ -5,7 +5,7 @@
         class="block"
     >
     <div
-        class="relative bg-white/50 backdrop-blur-lg rounded-2xl shadow-sm border border-gray-100 p-5 pt-6 overflow-visible"
+        class="relative bg-white/50 backdrop-blur-lg rounded-2xl shadow-sm border border-gray-100 p-5 pt-6 overflow-visible  "
     >
         <!-- Top Colored Border -->
         <div

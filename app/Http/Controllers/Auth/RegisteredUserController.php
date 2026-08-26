@@ -52,7 +52,7 @@ if ($user->role === 'admin') {
     return redirect('/admin/products');
 }
 
-return redirect('/');
+return redirect()->intended('/');
 
 
 

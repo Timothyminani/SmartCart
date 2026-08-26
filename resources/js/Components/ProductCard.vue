@@ -1,171 +1,4 @@
 
-<template>
-  <div
-  :class="[
-    'bg-white rounded-xl border border-gray-100 hover:shadow-md transition overflow-hidden group flex flex-col',
-    compact ? 'h-[290px] w-[260px]' : 'h-[340px]'
-  ]"
->
-
-    <!-- IMAGE -->
-  <div
-  :class="[
-    'relative bg-gray-100 overflow-hidden',
-    compact ? 'h-40' : 'h-40'
-  ]"
->
-<Link
- v-if="product?.slug"
- :href="route('products.show', { product: product.slug })">
-      <img
-         :src="product.images?.length 
-    ? `/storage/${product.images[0].image_path}` 
-    : '/placeholder.png'"
-        class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-      />
-</Link>
-      <!-- AI BADGE -->
-      <span
-        v-if="showAiBadge"
-        class="absolute top-2 left-2 flex items-center gap-1 text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full"
-      >
-        <Sparkles class="w-3 h-3" />
-        AI Pick
-      </span>
-
-      <!-- Wishlist -->
-      <button class="absolute top-2 right-2 bg-white p-1.5 rounded-full shadow hover:text-red-500 transition">
-        <Heart class="w-4 h-4" />
-      </button>
-
-    </div>
-
-    <!-- CONTENT -->
-    <div class="p-3 flex flex-col flex-1">
-
-      <!-- NAME -->
-
-      <Link 
-      v-if="product?.slug"
-      :href="route('products.show', { product: product.slug })"
-      class="hover:text-blue-600 transition"
-      >
-      <h3 
-       
-      class=" font-medium text-gray-800 line-clamp-2 leading-tight">
-        {{ product.name }}
-      </h3>
-    </Link>
-      <!-- PRICE -->
-      <p class="mt-1 text-sm text-blue-600 font-semibold">
-        KES {{ formatPrice(product.sale_price) }}
-      </p>
-
-      <!-- ⭐ RATING -->
-      <div 
-       v-if="!compact"
-      class="flex items-center gap-1 mt-1 text-yellow-400">
-        <Star class="w-3 h-3 fill-yellow-400" />
-        <Star class="w-3 h-3 fill-yellow-400" />
-        <Star class="w-3 h-3 fill-yellow-400" />
-        <Star class="w-3 h-3 fill-yellow-400" />
-        <Star class="w-3 h-3 text-gray-300" />
-        <span class="text-[10px] text-gray-500 ml-1">(24)</span>
-      </div>
-
-      <!-- PUSH ACTIONS DOWN -->
-      <div class="mt-auto pt-2 space-y-2">
-
-        <!-- Compare -->
-        <label 
-         v-if="!compact"
-        class="flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer">
-  <input
-  type="checkbox"
-  class="accent-blue-600"
-  :checked="isInCompare(product.id)"
-  @change="handleCompare"
-  />
-          Compare
-        </label>
-
-        <!-- Add to Cart -->
-    <!-- 🛒 CART SECTION -->
-<div>
-
-  <!-- 🟢 NOT IN CART -->
-
-  <div
-    v-if="product.stock_quantity <= 0"
-    class="w-full bg-red-100 text-red-600 text-center py-2 rounded-lg font-medium"
->
-    Out of Stock
-</div>
-  <button
-    v-else-if="!cartItem"
-    @click="handleAdd"
-    class="w-full flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg transition"
-  >
-    <ShoppingCart class="w-4 h-4" />
-    Add to Cart
-  </button>
-
-  <!-- 🔵 IN CART -->
-  <div
-    v-else
-    class="w-full flex items-center justify-between text-white px-2 py-2 rounded-lg"
-  >
-
-    <!-- MINUS -->
-    <button
-      @click="handleDecrease"
-       :disabled="loading"
-      class="px-2 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
-    >
-      <Minus class="w-4 h-4" />
-    </button>
-
-    <!-- QUANTITY -->
-   <span class="text-sm font-semibold flex items-center justify-center">
-
-  <!-- 🔄 LOADING -->
-  <Loader2
-    v-if="loading"
-    class="w-4 h-4 text-blue-600 animate-spin"
-  />
-
-  <!-- 🔢 NORMAL -->
-  <span v-else class="text-black">
-    {{ cartItem?.quantity }}
-  </span>
-
-</span>
-
-    <!-- PLUS -->
-    <button
-      @click="handleIncrease"
-       :disabled="loading"
-      class="px-2 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
-    >
-      <Plus class="w-4 h-4" />
-    </button>
-
-  </div>
-
-</div>
-
-
-
-      </div>
-
-    </div>
-
-  </div>
-</template>
-
-
-
-
 <script setup>
 import { Sparkles, Heart, Star, ShoppingCart } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
@@ -176,9 +9,10 @@ import { onMounted } from 'vue'
 import { onBeforeUnmount } from 'vue'
 import { useCart } from '@/composables/useCart'
 import { useCompare } from '@/composables/useCompare'
+import { useWishlist } from '@/composables/useWishlist'
 
 const loading = ref(false)
-// ✅ 1. define props FIRST
+//  1. define props FIRST
 const props = defineProps({
   product: Object,
   showAiBadge: Boolean,
@@ -188,13 +22,13 @@ const props = defineProps({
 const errorMessage = ref('')
 
 
-// ✅ 2. useCart AFTER props
+//  2. useCart AFTER props
 const { addToCart, increaseQty, decreaseQty, getCartItem, removeItem } = useCart()
 const { toggleCompare, isInCompare } = useCompare()
-// ✅ 3. reactivity helper
+//  3. reactivity helper
 const refresh = ref(0)
 
-// ✅ 4. computed AFTER everything is defined
+//  4. computed AFTER everything is defined
 
 const cartItem = ref(null)
 
@@ -202,7 +36,7 @@ const cartItem = ref(null)
 
 
 
-// ✅ 5. handlers
+//  5. handlers
 const handleAdd = async () => {
 
   loading.value = true
@@ -274,6 +108,7 @@ const formatPrice = (value) => {
 
 onMounted(async () => {
   cartItem.value = await getCartItem(props.product.id)
+  loadWishlist()
 })
 
 
@@ -297,6 +132,248 @@ const handleCompare = () => {
 
 
 
+const {
+    isInWishlist,
+    toggleWishlist,
+    loadWishlist
+} = useWishlist()
+
+
+const reviews = computed(() => {
+  return props.product.reviews || []
+})
+
+const averageRating = computed(() => {
+
+  if (!reviews.value.length) {
+    return 0
+  }
+
+  const total = reviews.value.reduce(
+    (sum, review) => sum + Number(review.rating || 0),
+    0
+  )
+
+  return total / reviews.value.length
+})
+
+const formattedAverageRating = computed(() => {
+  return averageRating.value
+    ? averageRating.value.toFixed(1)
+    : '0.0'
+})
+
+
+
+
+
 
 
 </script>
+
+
+
+
+<template>
+  <div
+  :class="[
+    'bg-white rounded-xl border border-gray-100 hover:shadow-md transition overflow-hidden group flex flex-col',
+    compact ? 'h-[290px] w-[260px]' : 'h-[340px]'
+  ]"
+>
+
+    <!-- IMAGE -->
+  <div
+  :class="[
+    'relative bg-gray-100 overflow-hidden',
+    compact ? 'h-40' : 'h-40'
+  ]"
+>
+<Link
+ v-if="product?.slug"
+ :href="route('products.show', { product: product.slug })">
+      <img
+         :src="product.images?.length 
+    ? `/storage/${product.images[0].image_path}` 
+    : '/placeholder.png'"
+        class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+      />
+</Link>
+      <!-- AI BADGE -->
+      <span
+        v-if="showAiBadge"
+        class="absolute top-2 left-2 flex items-center gap-1 text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full"
+      >
+        <Sparkles class="w-3 h-3" />
+        AI Pick
+      </span>
+
+      <!-- Wishlist -->
+        <button
+          @click.prevent="toggleWishlist(props.product.id)"
+          class="absolute top-2 right-2 bg-white p-1.5 rounded-full shadow transition"
+          :class="isInWishlist(props.product.id)
+              ? 'text-red-500'
+              : 'text-gray-500 hover:text-red-500'"
+      >
+          <Heart
+              class="w-4 h-4"
+              :fill="isInWishlist(props.product.id) ? 'currentColor' : 'none'"
+          />
+      </button>
+
+    </div>
+
+    <!-- CONTENT -->
+    <div class="p-3 flex flex-col flex-1">
+
+      <!-- NAME -->
+
+      <Link 
+      v-if="product?.slug"
+      :href="route('products.show', { product: product.slug })"
+      class="hover:text-blue-600 transition"
+      >
+      <h3 
+       
+      class=" font-medium text-gray-800 line-clamp-2 leading-tight">
+        {{ product.name }}
+      </h3>
+    </Link>
+      <!-- PRICE -->
+      <p class="mt-1 text-sm text-blue-600 font-semibold">
+        KES {{ formatPrice(product.sale_price) }}
+      </p>
+
+      <!-- ⭐ RATING -->
+    
+<div
+    v-if="!compact"
+    class="flex items-center gap-1 mt-1"
+>
+
+    <div class="flex items-center gap-0.5">
+
+        <Star
+            v-for="star in 5"
+            :key="star"
+            class="w-3 h-3"
+            :class="
+                star <= Math.round(averageRating)
+                    ? 'text-yellow-400 fill-yellow-400'
+                    : 'text-gray-300'
+            "
+        />
+
+    </div>
+
+    <span
+        v-if="reviews.length"
+        class="text-[10px] text-gray-500 ml-1"
+    >
+        {{ formattedAverageRating }}
+        ({{ reviews.length }})
+    </span>
+
+    <span
+        v-else
+        class="text-[10px] text-gray-400 ml-1"
+    >
+      
+    </span>
+
+</div>
+
+      <!-- PUSH ACTIONS DOWN -->
+      <div class="mt-auto pt-2 space-y-2">
+
+        <!-- Compare -->
+        <label 
+         v-if="!compact"
+        class="flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer">
+  <input
+  type="checkbox"
+  class="accent-blue-600"
+  :checked="isInCompare(product.id)"
+  @change="handleCompare"
+  />
+          Compare
+        </label>
+
+        <!-- Add to Cart -->
+    <!--  CART SECTION -->
+<div>
+
+  <!--  NOT IN CART -->
+
+  <div
+    v-if="product.stock_quantity <= 0"
+    class="w-full bg-red-100 text-red-600 text-center py-2 rounded-lg font-medium"
+>
+    Out of Stock
+</div>
+  <button
+    v-else-if="!cartItem"
+    @click="handleAdd"
+    class="w-full flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg transition"
+  >
+    <ShoppingCart class="w-4 h-4" />
+    Add to Cart
+  </button>
+
+  <!--  IN CART -->
+  <div
+    v-else
+    class="w-full flex items-center justify-between text-white px-2 py-2 rounded-lg"
+  >
+
+    <!-- MINUS -->
+    <button
+      @click="handleDecrease"
+       :disabled="loading"
+      class="px-2 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
+    >
+      <Minus class="w-4 h-4" />
+    </button>
+
+    <!-- QUANTITY -->
+   <span class="text-sm font-semibold flex items-center justify-center">
+
+  <!-- LOADING -->
+  <Loader2
+    v-if="loading"
+    class="w-4 h-4 text-blue-600 animate-spin"
+  />
+
+  <!--  NORMAL -->
+  <span v-else class="text-black">
+    {{ cartItem?.quantity }}
+  </span>
+
+</span>
+
+    <!-- PLUS -->
+    <button
+      @click="handleIncrease"
+       :disabled="loading"
+      class="px-2 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
+    >
+      <Plus class="w-4 h-4" />
+    </button>
+
+  </div>
+
+</div>
+
+
+
+      </div>
+
+    </div>
+
+  </div>
+</template>
+
+
+
+

@@ -7,6 +7,10 @@ use Inertia\Middleware;
 use App\Models\Order;
 use App\Models\AdminNotification;
 use App\Models\Product;
+use App\Models\Category;
+use App\Models\Brand;
+
+
 
 class HandleInertiaRequests extends Middleware
 {
@@ -68,6 +72,19 @@ class HandleInertiaRequests extends Middleware
                 : 0,
 
         ],
+
+
+'navigation' => [
+    'categories' => Category::query()
+        ->select('id', 'name', 'slug')
+        ->orderBy('name')
+        ->get(),
+
+    'brands' => Brand::query()
+        ->select('id', 'name', 'logo')
+        ->orderBy('name')
+        ->get(),
+],
 
 
         

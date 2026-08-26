@@ -223,19 +223,21 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { Eye, EyeOff } from 'lucide-vue-next';
 
-defineProps({
+const props = defineProps({
     canResetPassword: {
         type: Boolean,
     },
     status: {
         type: String,
     },
-});
+   
+})
 
 const form = useForm({
     email: '',
     password: '',
     remember: false,
+   
 });
 
 const submit = () => {

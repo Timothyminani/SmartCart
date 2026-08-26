@@ -104,7 +104,7 @@ v-if="collapsed"
         <!-- USERS -->
 
         <Link
-            href="/admin/users"
+            :href="route('admin.users.index')"
             :class="[
                 'flex items-center justify-between px-3 py-3 rounded-xl transition font-bold mb-1',
                 $page.url.startsWith('/admin/users')
@@ -315,7 +315,7 @@ v-if="collapsed"
         <div class="flex-1 flex flex-col">
 
             <!-- Top Navbar -->
-<header class="bg-white/15 backdrop-blur-xl border-1 shadow px-6 py-4 flex justify-between items-center rounded-xl  border">
+<header class="bg-white/15 backdrop-blur-xl border-1 shadow px-6 py-4 flex justify-between items-center rounded-xl  border z-50">
 
 <div class="flex items-center gap-4">
 
@@ -410,7 +410,7 @@ v-if="collapsed"
     <div
         v-if="showNotifications"
         class="absolute right-0 mt-3 w-96 bg-white rounded-2xl
-               shadow-xl border z-50 overflow-hidden"
+               shadow-xl border z-100 overflow-hidden"
     >
 
         <!-- Header -->
@@ -542,12 +542,14 @@ v-if="collapsed"
 
 
 <script setup>
-import { Link} from '@inertiajs/vue3'
+import { Link } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 import { watch } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import logo from '@/Assets/Images/logo4test.png'
+import { route } from 'ziggy-js'
+
 import {
     LayoutDashboard,
     Folder,

@@ -21,6 +21,11 @@ use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\WishlistController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\ProductSearchController;
 
 // Customize Routes
 
@@ -34,6 +39,14 @@ Route::get('/auth/google/callback', [GoogleController::class, 'callback']);
 //Admin Routes
 
 Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
+
+// Customers
+Route::get('/users', [CustomerController::class, 'index'])
+    ->name('admin.users.index');
+
+Route::get('/users/{user}', [CustomerController::class, 'show'])
+    ->name('admin.users.show');
+
 
     // categories
 
@@ -154,18 +167,9 @@ Route::get('/payment/{payment}', [PaymentController::class, 'show'])
 
 
 
-
-
     
-Route::get('/', function () {
-    return Inertia::render('Home', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
-});
-
+Route::get('/', [HomeController::class, 'index'])
+    ->name('home');
 
 
 Route::get('/admin/dashboard', [AdminDashboardController::class, 'index'])
@@ -197,14 +201,30 @@ Route::middleware(['auth','admin'])
 
 
 
+Route::get('/wishlist/products', [WishlistController::class, 'products'])
+    ->name('wishlist.products');
 
 
 
+Route::middleware('auth')->group(function () {
+
+    Route::post(
+        '/products/{product}/reviews',
+        [ReviewController::class, 'store']
+    )->name('reviews.store');
+
+    Route::delete(
+        '/reviews/{review}',
+        [ReviewController::class, 'destroy']
+    )->name('reviews.destroy');
+
+});
 
 
-
-
-
+Route::get(
+    '/search/suggestions',
+    [ProductSearchController::class, 'suggestions']
+)->name('search.suggestions');
 
 
 
