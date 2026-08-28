@@ -1,1 +1,0 @@
-import{c as e}from"./shopping-bag-B07wto3s.js";const a=e("panel-left",[["rect",{width:"18",height:"18",x:"3",y:"3",rx:"2",key:"afitv7"}],["path",{d:"M9 3v18",key:"fh3hqa"}]]);export{a as P};

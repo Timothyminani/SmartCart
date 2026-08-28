@@ -9,35 +9,56 @@ use Inertia\Inertia;
 class HomeController extends Controller
 {
     public function index()
-{
-    $popularCategories = Category::whereHas('products', function ($query) {
-            $query->where('is_featured', true)
-                  ->where('is_active', true)
-                  ->where('stock_quantity', '>', 0);
-        })
-        ->withCount([
-            'products as featured_products_count' => function ($query) {
-                $query->where('is_featured', true)
-                      ->where('is_active', true)
-                      ->where('stock_quantity', '>', 0);
-            }
-        ])
-        ->orderByDesc('featured_products_count')
-        ->take(8)
-        ->get();
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Popular Categories
+        |--------------------------------------------------------------------------
+        */
 
-    $featuredProducts = Product::with(['category', 'brand', 'images'])
-        ->where('is_featured', true)
-        ->where('is_active', true)
-        ->where('stock_quantity', '>', 0)
-        ->latest()
-        ->take(8)
-        ->get();
+        $popularCategories = Category::query()
+            ->where('is_featured', true)
+            ->whereNotNull('image')
+            ->latest()
+            ->take(6)
+            ->get([
+                'id',
+                'name',
+                'slug',
+                'image',
+                'is_featured',
+            ]);
 
-    return Inertia::render('Home', [
-        'popularCategories' => $popularCategories,
-        'featuredProducts' => $featuredProducts,
-        'selectedCategory' => null,
-    ]);
-}
+
+        /*
+        |--------------------------------------------------------------------------
+        | Featured Products
+        |--------------------------------------------------------------------------
+        */
+
+        $featuredProducts = Product::with([
+                'category',
+                'brand',
+                'images',
+            ])
+            ->where('is_featured', true)
+            ->where('is_active', true)
+            ->where('stock_quantity', '>', 0)
+            ->latest()
+            ->take(8)
+            ->get();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Home Page
+        |--------------------------------------------------------------------------
+        */
+
+        return Inertia::render('Home', [
+            'popularCategories' => $popularCategories,
+            'featuredProducts' => $featuredProducts,
+            'selectedCategory' => null,
+        ]);
+    }
 }
