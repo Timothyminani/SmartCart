@@ -29,7 +29,7 @@ class AiExplanationService
         }
 
 
-            sleep(7);
+            sleep(12);
         /*
         |--------------------------------------------------------------------------
         | PRODUCT SUMMARY
