@@ -3,224 +3,285 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class AiExplanationService
 {
-    public function generate(string $query, array $intent, $products): array
-    {
-        
-        // =========================
-        // ENRICH PRODUCT DATA
-        // =========================
-        $productSummary = $products->map(function ($p) {
+    public function generate(
+        string $query,
+        array $intent,
+        $products
+    ): array {
+        /*
+        |--------------------------------------------------------------------------
+        | NO MATCHES
+        |--------------------------------------------------------------------------
+        |
+        | Do not call the AI when there are no products to explain.
+        |
+        */
 
+        if ($products->isEmpty()) {
             return [
-                'name' => $p->name,
-                'price' => $p->sale_price,
-                'brand' => $p->brand->name ?? null,
-                'category' => $p->category->name ?? null,
-
-                // IMPORTANT: ATTRIBUTES FOR AI REASONING
-                'attributes' => $p->attributes->map(function ($a) {
-                    return [
-                        'name' => $a->attribute_name,
-                        'value' => $a->attribute_value,
-                    ];
-                })->toArray(),
-
-                // EXTRA SIGNALS (VERY USEFUL FOR AI)
-                'spec_signals' => [
-                    'has_rtx' => str_contains(strtolower($p->name), 'rtx'),
-                    'has_high_ram' => str_contains(strtolower($p->name), '16gb') ||
-                                      str_contains(strtolower($p->name), '32gb'),
-                    'has_ssd' => true, // assume SSD unless you track it
-                    'is_premium' => str_contains(strtolower($p->name), 'pro') ||
-                                    str_contains(strtolower($p->name), 'xps') ||
-                                    str_contains(strtolower($p->name), 'macbook'),
-                ]
+                'ai_explanation' => '',
+                'refinement_suggestions' => $this->buildNoMatchSuggestions($intent),
             ];
-        })->toArray();
+        }
 
-        // =========================
-        // PROMPT
-        // =========================
+
+            sleep(7);
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCT SUMMARY
+        |--------------------------------------------------------------------------
+        |
+        | Only send real catalog data.
+        | No fabricated product signals.
+        |
+        */
+
+        $productSummary = $products
+            ->map(function ($product) {
+                return [
+                    'name' => $product->name,
+
+                    'price' => $this->effectivePrice($product),
+
+                    'brand' => $product->brand->name ?? null,
+
+                    'category' => $product->category->name ?? null,
+
+                    'ai_score' => $product->ai_score ?? null,
+
+                    'attributes' => $product->attributes
+                        ->map(function ($attribute) {
+                            return [
+                                'name' => $attribute->attribute_name,
+                                'value' => $attribute->attribute_value,
+                            ];
+                        })
+                        ->values()
+                        ->toArray(),
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        /*
+        |--------------------------------------------------------------------------
+        | PROMPT
+        |--------------------------------------------------------------------------
+        */
+
         $prompt = "
-You are SmartCart AI.
+You are SmartCart AI, an ecommerce shopping assistant.
 
-You are an elite ecommerce shopping assistant similar to Alibaba AI, Amazon Rufus, and Perplexity Shopping.
+Your job is to explain WHY the supplied products are relevant to the customer's request.
 
-Your job is to help users choose the BEST products based on their needs.
+You are NOT searching the catalog.
+You are NOT allowed to invent products.
+You are NOT allowed to invent specifications.
+
+The PRODUCT DATA below is the only product information you may use.
 
 ==================================================
-USER QUERY
+CUSTOMER QUERY
 ==================================================
+
 {$query}
 
 ==================================================
-USER INTENT
-==================================================
-" . json_encode($intent, JSON_PRETTY_PRINT) . "
-
-==================================================
-PRODUCTS DATA
-==================================================
-" . json_encode($productSummary, JSON_PRETTY_PRINT) . "
-
-==================================================
-RESPONSE INSTRUCTIONS
+INTERPRETED CUSTOMER INTENT
 ==================================================
 
-Generate a PROFESSIONAL ecommerce AI response.
-
-The response MUST feel premium, intelligent, and highly structured.
-
-Use this exact structure:
-
-1. Short overview paragraph
-2. Top recommendations section
-3. Key differences section
-4. Buying advice section
-5. Quick Specs Guide section
+" . json_encode(
+            $intent,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+        ) . "
 
 ==================================================
-MARKDOWN FORMATTING RULES
+MATCHING PRODUCTS
 ==================================================
 
-Format the response using PROPER MARKDOWN.
-
-Use:
-
-## Section Titles
-
-Example:
-## Top Recommendations
-
-Use bullet points for recommendations:
-
-- **Best Overall:** explanation here
-- **Best Budget Option:** explanation here
-
-Use bold labels for important attributes:
-
-- **Performance:** excellent for gaming
-- **Battery:** lasts up to 10 hours
-
-Leave ONE empty line between sections.
-
-DO NOT return HTML.
+" . json_encode(
+            $productSummary,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+        ) . "
 
 ==================================================
-IMPORTANT RULES
+CORE RULES
 ==================================================
 
-- Sound like a premium AI shopping assistant
-- Be conversational and intelligent
-- DO NOT repeat raw attributes
-- DO NOT hallucinate specifications
-- Keep explanations concise but informative
-- Use headings
-- Use bullet points where appropriate
-- Mention tradeoffs naturally
-- Make the response feel modern and AI-native
+1. Use ONLY the supplied product data.
 
+2. Never invent:
+- specifications
+- battery life
+- performance claims
+- camera quality
+- display quality
+- materials
+- warranty information
+- benchmarks
+- software compatibility
+- ports
+- features
+- product capabilities
 
-IMPORTANT MARKDOWN RULES:
-- Use # for main headings
-- Use ## for section headings
-- Use ### for subsection headings
-- Use bullet points using -
-- Use bold text using **
-- Add spacing between sections
-- DO NOT wrap response in code blocks
-- DO NOT return HTML
-- Format output like a modern AI assistant response
+unless they are explicitly supported by the supplied product data.
 
-Example format:
+3. Do not assume that a product has a feature simply because:
+- its name sounds premium
+- its model family usually has that feature
+- similar products commonly have that feature
 
-## AI Mode Overview
+4. Respect the customer's hard requirements and budget.
 
-For content creators, laptops with strong GPUs, high RAM, and color-accurate displays deliver the best editing experience.
+5. Do not claim that a product satisfies a requirement unless the supplied data supports that claim.
 
-2. Top Recommendations section
+6. The products have already been filtered and ranked by SmartCart.
+Your task is to explain the strongest matches and meaningful tradeoffs.
 
-The \"Top Recommendations\" section title should dynamically adapt to the user's intent.
+7. If there is only one product, do not create fake comparisons.
 
-Examples:
-- Top Recommendations for Adobe Illustrator
-- Top Recommendations for Gaming
+8. If product data is insufficient to compare something, simply leave that comparison out.
 
-The content under this section MUST remain in bullet format:
+9. PERFORMANCE COMPARISON RULE
 
-- **Best Overall:** explanation here
-- **Best Budget Option:** explanation here
-- **Best Premium Option:** explanation here
+Do not claim that one processor, GPU, camera, battery, display, or product
+performs better than another unless the supplied product data directly
+supports that comparison.
 
-Each recommendation must include:
-- a clear label (Best Overall, Budget, Premium, etc.)
-- a short
+Do not infer benchmark performance from model names alone.
 
-## Key Differences
+You may describe factual differences such as:
+- processor model
+- core count
+- RAM amount
+- storage amount
+- battery specification
+- display specification
+- price
+- weight
 
-- **Performance:** MacBook Pro leads in rendering efficiency.
+But do not convert those differences into unsupported claims such as:
+- faster
+- more powerful
+- better performance
+- better camera
+- better display
+- better battery life
 
-- **Battery:** MacBook lasts longer than most Windows alternatives.
+unless the supplied product data directly supports that conclusion.
 
-- **Portability:** Zenbook is lighter and easier to carry.
+==================================================
+AI EXPLANATION
+==================================================
 
-## Buying Advice
+Write a concise, useful shopping explanation.
 
-- **For Professionals:** Choose MacBook Pro.
+Use markdown inside ai_explanation.
 
-- **For Students:** Zenbook offers better value.
+Prefer this structure when appropriate:
 
-##Quick Specs Guide for the User's Use Case
+## Best Matches
 
-Create a small buying guide showing the MOST IMPORTANT specifications the user should pay attention to when choosing products.
+Explain the strongest product choices.
 
-The section title MUST dynamically adapt to the user's needs.
+For each recommended product:
+- name the actual product
+- explain why it fits the customer's request
+- mention relevant strengths supported by the data
+- mention meaningful tradeoffs when supported by the data
 
-Examples:
-- Quick Specs Guide for Adobe Illustrator
-- Quick Specs Guide for Gaming
+Example style:
 
-Use a markdown table WHEN appropriate.
+- **Best Overall — Product Name:** concise reason.
+- **Best Value — Product Name:** concise reason.
+- **Alternative — Product Name:** concise reason.
 
-The table should help the user understand:
-- minimum recommended specs
-- ideal specs for professionals
-- what features matter most
+Do NOT force these exact labels if they do not fit the available products.
 
-Examples of things to compare:
+==================================================
+KEY DIFFERENCES
+==================================================
+
+When there are multiple products, briefly explain the most useful differences.
+
+Only compare information actually present in the product data.
+
+Possible differences may include:
+- price
 - RAM
 - storage
-- display
-- GPU
-- battery
 - processor
-- refresh rate
-- camera quality
-- cooling
-- portability
+- graphics
+- display
+- battery
+- network
+- camera
+- ports
+- other supplied attributes
 
-Only include specifications relevant to the user's query.
-
-- Use markdown tables when useful
-- Tables should look clean and readable
-- Keep tables concise
-";
-
-$prompt .= "
+Do not include irrelevant categories of comparison.
 
 ==================================================
-FINAL RESPONSE FORMAT
+BUYING ADVICE
 ==================================================
 
-Return your response STRICTLY in valid JSON format.
+Give a short final recommendation based on the customer's stated needs.
 
-Use this exact structure:
+Explain which product is the strongest fit and why.
+
+Do not tell the customer to buy a product based on unsupported claims.
+
+==================================================
+QUICK SPECS GUIDE
+==================================================
+
+Include a small buying guide ONLY when it adds useful context.
+
+The guide should explain what specifications matter for the customer's use case.
+
+This guide is general shopping guidance and MUST NOT falsely attribute those specifications to the supplied products.
+
+Keep it short.
+
+A markdown table may be used when useful.
+
+==================================================
+REFINEMENT SUGGESTIONS
+==================================================
+
+Return between 0 and 5 short clickable search refinements.
+
+They should:
+- relate directly to the customer's current search
+- help narrow or adjust the search
+- sound like natural searches
+- not be conversational questions
+- not claim unsupported product facts
+
+Examples of style:
+
+- Lower budget alternatives
+- More storage options
+- Lightweight options for travel
+- Premium photography phones
+- Longer battery life options
+- Gaming laptops with dedicated graphics
+
+Do not make every suggestion laptop-specific.
+Adapt them to the current category and customer intent.
+
+==================================================
+OUTPUT FORMAT
+==================================================
+
+Return ONLY valid JSON in exactly this structure:
 
 {
-  \"ai_explanation\": \"markdown formatted explanation here\",
+  \"ai_explanation\": \"markdown explanation\",
   \"refinement_suggestions\": [
     \"suggestion 1\",
     \"suggestion 2\",
@@ -228,123 +289,295 @@ Use this exact structure:
   ]
 }
 
-IMPORTANT RULES:
-
-- ai_explanation MUST contain markdown
-
-- refinement_suggestions are NOT conversational questions
-
-- refinement_suggestions MUST behave like:
-  - search refinements
-  - shopping filters
-  - buying constraints
-  - product narrowing suggestions
-
-GOOD EXAMPLES:
-- Lightweight laptops for travel
-- RTX laptops for video editing
-- Budget gaming laptops under 60k
-- OLED display creator laptops
-- Quiet laptops for office work
-- Long battery ultrabooks
-- Premium laptops for developers
-
-BAD EXAMPLES:
-- What is your budget?
-- Do you have a preferred brand?
-- What software will you use?
-- Budget: under 50k
-- RAM: 16GB
-- Display: Full HD
-- Battery: 5 hours
-
-- Suggestions should be short
-- Suggestions should feel clickable
-- Suggestions should NOT sound like a conversation
-- Avoid sounding like filters or forms
-- Suggestions should feel like something users would actually search for
-- They should be not more than 5 suggestions
-- The questions should be based on common shopping constraints and refinements users typically consider when shopping for laptops and also should be somehow related to the user's query.
-- DO NOT return HTML
-- DO NOT wrap JSON in code blocks
-- Return ONLY valid JSON
-
-If you do not return valid JSON, the system will reject your response.
+Do not return HTML.
+Do not wrap the JSON in markdown code fences.
+Do not include text before or after the JSON.
 ";
 
-        // =========================
-        // GPT-4o MINI (Replicate)
-        // =========================
-       
-     $response = Http::withToken(config('services.replicate.token'))
-    ->post('https://api.replicate.com/v1/models/openai/gpt-4o-mini/predictions', [
-        'input' => [
-            'prompt' => $prompt,
-            'system_prompt' => 'You are SmartCart AI. Always follow the user prompt exactly. Return ONLY valid JSON with ai_explanation (markdown) and refinement_suggestions array. No exceptions.',
-            'max_tokens' => 400,
-            'temperature' => 0.4,
-        ]
-    ]);
+        /*
+        |--------------------------------------------------------------------------
+        | CALL MODEL
+        |--------------------------------------------------------------------------
+        */
 
-$prediction = $response->json();
+        try {
+            $response = Http::withToken(
+                config('services.replicate.token')
+            )
+                ->timeout(30)
+                ->post(
+                    'https://api.replicate.com/v1/models/openai/gpt-4o-mini/predictions',
+                    [
+                        'input' => [
+                            'prompt' => $prompt,
 
-$getUrl = $prediction['urls']['get'] ?? null;
+                            'system_prompt' =>
+                                'You are SmartCart AI. Use only supplied catalog data. Never invent product facts. Return only valid JSON with ai_explanation and refinement_suggestions.',
 
-if (!$getUrl) {
-    return 'Unable to generate AI explanation.';
-}
+                            'max_tokens' => 600,
 
-// Poll Replicate until prediction completes
-for ($i = 0; $i < 15; $i++) {
+                            'temperature' => 0.2,
+                        ],
+                    ]
+                );
 
-    
+            if (!$response->successful()) {
+                Log::warning(
+                    'SmartCart AI explanation request failed.',
+                    [
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]
+                );
 
-    $pollResponse = Http::withToken(config('services.replicate.token'))
-        ->get($getUrl);
+                return $this->fallbackResponse();
+            }
 
-    $result = $pollResponse->json();
+            $prediction = $response->json();
 
-    if (($result['status'] ?? null) === 'succeeded') {
+            $getUrl = $prediction['urls']['get'] ?? null;
 
-    $output = $result['output'] ?? null;
+            if (!$getUrl) {
+                Log::warning(
+                    'SmartCart AI explanation prediction missing polling URL.',
+                    [
+                        'prediction' => $prediction,
+                    ]
+                );
 
-    $text = is_array($output)
-        ? implode('', $output)
-        : $output;
+                return $this->fallbackResponse();
+            }
 
-    $decoded = json_decode(trim($text ?? ''), true);
 
-    if (!$decoded) {
+
+
+
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | POLL
+            |--------------------------------------------------------------------------
+            */
+
+            for ($attempt = 0; $attempt < 15; $attempt++) {
+
+                sleep(1);
+
+                $pollResponse = Http::withToken(
+                    config('services.replicate.token')
+                )
+                    ->timeout(30)
+                    ->get($getUrl);
+
+                if (!$pollResponse->successful()) {
+                    Log::warning(
+                        'SmartCart AI explanation polling failed.',
+                        [
+                            'status' => $pollResponse->status(),
+                            'body' => $pollResponse->body(),
+                        ]
+                    );
+
+                    continue;
+                }
+
+                $result = $pollResponse->json();
+
+                $status = $result['status'] ?? null;
+
+                if ($status === 'succeeded') {
+                    return $this->parseResult(
+                        $result['output'] ?? null
+                    );
+                }
+
+                if (
+                    $status === 'failed' ||
+                    $status === 'canceled'
+                ) {
+                    Log::warning(
+                        'SmartCart AI explanation prediction did not succeed.',
+                        [
+                            'status' => $status,
+                            'error' => $result['error'] ?? null,
+                        ]
+                    );
+
+                    return $this->fallbackResponse();
+                }
+            }
+
+            Log::warning(
+                'SmartCart AI explanation timed out while polling.'
+            );
+
+            return $this->fallbackResponse();
+
+        } catch (\Throwable $e) {
+
+            Log::error(
+                'SmartCart AI explanation exception.',
+                [
+                    'message' => $e->getMessage(),
+                ]
+            );
+
+            return $this->fallbackResponse();
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PARSE MODEL OUTPUT
+    |--------------------------------------------------------------------------
+    */
+
+    private function parseResult($output): array
+    {
+        $text = is_array($output)
+            ? implode('', $output)
+            : (string) $output;
+
+        $text = trim($text);
+
+        if ($text === '') {
+            return $this->fallbackResponse();
+        }
+
+        /*
+         * Defensive cleanup if the model unexpectedly adds code fences.
+         */
+        $text = preg_replace(
+            '/^```(?:json)?\s*|\s*```$/i',
+            '',
+            $text
+        );
+
+        $decoded = json_decode(
+            trim($text),
+            true
+        );
+
+        if (!is_array($decoded)) {
+            Log::warning(
+                'SmartCart AI explanation returned invalid JSON.',
+                [
+                    'output' => $text,
+                ]
+            );
+
+            return $this->fallbackResponse();
+        }
+
+        $explanation =
+            $decoded['ai_explanation'] ?? '';
+
+        $suggestions =
+            $decoded['refinement_suggestions'] ?? [];
+
+        if (!is_string($explanation)) {
+            $explanation = '';
+        }
+
+        if (!is_array($suggestions)) {
+            $suggestions = [];
+        }
+
+        $suggestions = collect($suggestions)
+            ->filter(fn ($suggestion) => is_string($suggestion))
+            ->map(fn ($suggestion) => trim($suggestion))
+            ->filter()
+            ->unique()
+            ->take(5)
+            ->values()
+            ->toArray();
+
         return [
-            'ai_explanation' => $text ?? '',
-            'refinement_suggestions' => []
+            'ai_explanation' => trim($explanation),
+            'refinement_suggestions' => $suggestions,
         ];
     }
 
-    return [
-        'ai_explanation' => $decoded['ai_explanation'] ?? '',
-        'refinement_suggestions' => $decoded['refinement_suggestions'] ?? []
-    ];
-}
 
+    /*
+    |--------------------------------------------------------------------------
+    | NO MATCH SUGGESTIONS
+    |--------------------------------------------------------------------------
+    */
 
+    private function buildNoMatchSuggestions(
+        array $intent
+    ): array {
+        $suggestions = [];
 
+        $category =
+            $intent['category']['primary'] ?? null;
 
-    if (($result['status'] ?? null) === 'failed') {
+        if (!empty($intent['budget_max'])) {
+            $suggestions[] =
+                'Show options with a higher budget';
+        }
 
-     return [
-    'ai_explanation' => 'AI explanation generation failed.',
-    'refinement_suggestions' => []
-];
+        if (!empty($intent['brand'])) {
+            $suggestions[] =
+                'Similar options from other brands';
+        }
+
+        if (!empty($intent['required_attributes'])) {
+            $suggestions[] =
+                'Show options with fewer specification requirements';
+        }
+
+        if ($category) {
+            $suggestions[] =
+                "Browse other {$category} options";
+        }
+
+        return array_slice(
+            array_values(
+                array_unique($suggestions)
+            ),
+            0,
+            5
+        );
     }
 
-        sleep(2); // wait before next poll
-}
+
+    /*
+    |--------------------------------------------------------------------------
+    | EFFECTIVE PRICE
+    |--------------------------------------------------------------------------
+    */
+
+    private function effectivePrice(
+        $product
+    ): float {
+        $salePrice =
+            (float) ($product->sale_price ?? 0);
+
+        if ($salePrice > 0) {
+            return $salePrice;
+        }
+
+        return (float) (
+            $product->price ?? 0
+        );
+    }
 
 
-return [
-    'ai_explanation' => 'AI explanation is taking longer than expected.',
-    'refinement_suggestions' => []
-];
+    /*
+    |--------------------------------------------------------------------------
+    | SAFE FALLBACK
+    |--------------------------------------------------------------------------
+    */
+
+    private function fallbackResponse(): array
+    {
+        return [
+            'ai_explanation' => '',
+            'refinement_suggestions' => [],
+        ];
     }
 }

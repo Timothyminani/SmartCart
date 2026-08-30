@@ -5,681 +5,1008 @@ namespace App\Services;
 use App\Models\Brand;
 use App\Models\Category;
 use Illuminate\Support\Facades\Http;
-use App\Models\ProductAttribute;
+use Illuminate\Support\Facades\Log;
 
 class AiIntentService
 {
+    private const MODEL_URL =
+        'https://api.replicate.com/v1/models/openai/gpt-4o-mini/predictions';
+
+    /**
+     * Extract a clean shopping intent from the user's query.
+     */
     public function extractIntent(string $query): array
     {
-        $categories = Category::pluck('name')
-            ->filter()
-            ->values()
-            ->toArray();
+        $catalog = $this->buildCatalogContext();
 
-        $brands = Brand::pluck('name')
-            ->filter()
-            ->values()
-            ->toArray();
+        $intent = $this->requestIntent(
+            $query,
+            $catalog
+        );
 
-        $attributesByCategory = Category::with([
-            'products.attributes'
-        ])->get();    
+        if (!$intent) {
+            return $this->emptyIntent();
+        }
 
+        $validation = $this->validateIntent(
+            $intent,
+            $catalog
+        );
 
-        $attributeText = '';
+        /*
+        |--------------------------------------------------------------------------
+        | VALID INTENT
+        |--------------------------------------------------------------------------
+        */
+        if ($validation['valid']) {
+            return $this->normalizeIntent($intent);
+        }
 
-foreach ($attributesByCategory as $category) {
+        /*
+        |--------------------------------------------------------------------------
+        | ONE CORRECTION ATTEMPT
+        |--------------------------------------------------------------------------
+        |
+        | The AI returned something outside the current SmartCart catalog.
+        | Give it the exact validation errors and current catalog vocabulary
+        | and allow ONE correction attempt.
+        |
+        */
 
-    $attributeNames = $category->products
-        ->flatMap(function ($product) {
-            return $product->attributes;
-        })
-        ->pluck('attribute_name')
-        ->unique()
-        ->sort()
-        ->values()
-        ->toArray();
+        $correctedIntent = $this->requestCorrection(
+            $query,
+            $intent,
+            $validation['errors'],
+            $catalog
+        );
 
-    $attributeText .= "\n{$category->name}:\n";
+        if (!$correctedIntent) {
+            return $this->emptyIntent();
+        }
 
-    foreach ($attributeNames as $attribute) {
-        $attributeText .= "- {$attribute}\n";
+        $correctedValidation = $this->validateIntent(
+            $correctedIntent,
+            $catalog
+        );
+
+        if (!$correctedValidation['valid']) {
+
+            Log::warning('SmartCart AI intent failed validation after retry.', [
+                'query' => $query,
+                'intent' => $correctedIntent,
+                'errors' => $correctedValidation['errors'],
+            ]);
+
+            return $this->emptyIntent();
+        }
+
+        return $this->normalizeIntent($correctedIntent);
     }
-}
 
 
+    /**
+     * Build the current catalog vocabulary directly from the database.
+     *
+     * Nothing here depends on hardcoded category or attribute names.
+     */
+    private function buildCatalogContext(): array
+    {
+        $categories = Category::query()
+            ->with('products.attributes')
+            ->get();
 
-        $systemPrompt = "You are an expert ecommerce AI intent extraction engine. Return ONLY valid JSON.";
+        $categoryNames = $categories
+            ->pluck('name')
+            ->filter()
+            ->values()
+            ->toArray();
+
+        $brands = Brand::query()
+            ->pluck('name')
+            ->filter()
+            ->values()
+            ->toArray();
+
+        $attributesByCategory = [];
+
+        foreach ($categories as $category) {
+
+            $attributes = $category->products
+                ->flatMap(function ($product) {
+                    return $product->attributes;
+                })
+                ->pluck('attribute_name')
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->toArray();
+
+            $attributesByCategory[$category->name] = $attributes;
+        }
+
+        return [
+            'categories' => $categoryNames,
+            'brands' => $brands,
+            'attributes' => $attributesByCategory,
+        ];
+    }
 
 
-$prompt = "
-AVAILABLE CATEGORIES:
-" . implode(', ', $categories) . "
+    /**
+     * First AI intent extraction.
+     */
+    private function requestIntent(
+        string $query,
+        array $catalog
+    ): ?array {
 
-AVAILABLE BRANDS:
-" . implode(', ', $brands) . "
+        $prompt = $this->buildIntentPrompt(
+            $query,
+            $catalog
+        );
 
-AVAILABLE ATTRIBUTES BY CATEGORY:
-{$attributeText}
+        return $this->callModel($prompt);
+    }
 
-You are an AI shopping intent extraction engine for an electronics store.
 
-Your task is to analyze the user's search query and extract their shopping intent in a structured format.
+    /**
+     * Ask the AI to correct an invalid intent once.
+     */
+    private function requestCorrection(
+        string $query,
+        array $invalidIntent,
+        array $errors,
+        array $catalog
+    ): ?array {
 
-IMPORTANT:
+        $prompt = "
+You are SmartCart's shopping intent correction engine.
 
-Do NOT assume the user wants a computer.
+The previous intent extraction contained values that are not valid
+for the CURRENT SmartCart catalog.
 
-Always choose the most appropriate category from AVAILABLE CATEGORIES based on the user's request.
+Correct the intent using ONLY the catalog vocabulary supplied below.
 
-Examples:
+==================================================
+ORIGINAL USER QUERY
+==================================================
 
-'Best phone for content creation'
-=> Phones
+{$query}
 
-'Tablet for school'
-=> Tablets
+==================================================
+CURRENT SMARTCART CATALOG
+==================================================
 
-'Speaker for parties'
-=> Speakers
+" . $this->catalogPromptText($catalog) . "
 
-'Smartwatch for fitness'
-=> Watches
+==================================================
+INVALID INTENT
+==================================================
 
-'Fast charger for iPhone'
-=> Chargers
+" . json_encode(
+            $invalidIntent,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+        ) . "
 
-'USB-C cable for Samsung'
-=> Cables
+==================================================
+VALIDATION ERRORS
+==================================================
 
-'Laptop for programming'
-=> Computers
+" . json_encode(
+            $errors,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+        ) . "
 
-Return ONLY valid JSON in this exact structure:
+==================================================
+CORRECTION RULES
+==================================================
+
+- Preserve the meaning of the original user query.
+- Correct only values that conflict with the current catalog.
+- Category names MUST exactly match CURRENT CATEGORIES.
+- Brand MUST exactly match a CURRENT BRAND.
+- Attribute names MUST exactly match attributes available for
+  the relevant category.
+- Never invent a category, brand, or attribute.
+- Do not shorten or rename catalog values.
+- Do not invent technical requirements that the user did not request.
+- Return ONLY valid JSON.
+- Do not include markdown.
+- Do not include explanations.
+
+Use exactly this structure:
 
 {
   \"category\": {
     \"primary\": null,
     \"alternatives\": []
   },
-
   \"brand\": null,
-
   \"use_case\": null,
-
   \"budget_max\": null,
-
   \"budget_tier\": null,
-
   \"required_attributes\": {},
-
   \"preferred_attributes_by_category\": {},
-
   \"priority_features\": [],
-
   \"search_keywords\": []
 }
+";
 
-RULES
-
-1. category
-
-Return category as an object.
-
-{
-  \"primary\": null,
-  \"alternatives\": []
-}
-
-RULES:
-
-- primary must be the most likely category.
-- alternatives may contain other relevant categories.
-- Every category must come from AVAILABLE CATEGORIES.
-- Never invent categories.
-- If only one category is relevant, alternatives should be empty.
-
-Examples:
-
-User:
-\"Laptop for programming\"
-
-{
-  \"primary\": \"Computers\",
-  \"alternatives\": []
-}
-
-User:
-\"Best device for content creation\"
-
-{
-  \"primary\": \"Phones\",
-  \"alternatives\": [
-    \"Tablets\",
-    \"Computers\"
-  ]
-}
-
-User:
-\"Device for watching movies\"
-
-{
-  \"primary\": \"Tablets\",
-  \"alternatives\": [
-    \"Computers\",
-    \"Phones\"
-  ]
-}
-
-MULTI-CATEGORY RULE
-
-Some user requests can be satisfied by more than one category.
-
-Examples:
-
-\"Content creation\"
-=> Phones, Tablets, Computers
-
-\"Watching movies\"
-=> Tablets, Computers, Phones
-
-\"School work\"
-=> Tablets, Computers
-
-\"Business use\"
-=> Phones, Tablets, Computers
-
-When multiple categories are relevant:
-
-- Choose the most likely category as primary.
-- Put the others in alternatives.
-- Generate preferred_attributes_by_category for ALL categories.
-
-2. brand
-- Must be one of AVAILABLE BRANDS.
-- Only return a brand if explicitly mentioned.
-
-3. use_case
-Possible values:
-
-- Gaming
-- Programming
-- Business
-- School
-- Content Creation
-- Video Editing
-- Photography
-- Music
-- Fitness
-- Entertainment
-- Travel
-- Home Use
-- Office Use
-- Everyday Use
-
-4. budget_max
-Extract numerical budgets when present.
-
-Examples:
-
-'under 50000' => 50000
-'below 80000' => 80000
-'around 100000' => 100000
-
-5. budget_tier
-
-Possible values:
-
-- Budget
-- Mid Range
-- Premium
-
-6. required_attributes
-
-Extract attributes that the customer explicitly requires.
-
-These attributes MUST be used as hard filters.
-
-Examples:
-
-\"I need a laptop with HDMI\"
-
-{
-  \"required_attributes\": {
-    \"ports\": \"hdmi\"
-  }
-}
-
-\"I need a phone with 256GB storage\"
-
-{
-  \"required_attributes\": {
-    \"storage\": \"256gb\"
-  }
-}
-
-\"I need a smartwatch with GPS\"
-
-{
-  \"required_attributes\": {
-    \"gps\": true
-  }
-}
-
-
-
-REQUIRED ATTRIBUTES RULE:
-
-required_attributes MUST ONLY contain:
-1. exact numeric values
-2. boolean values (true/false)
-3. standardized technical specs
-
-DO NOT use descriptive words like:
-- long_life
-- strong
-- good
-- fast
-
-
-If a required attribute is not measurable:
-- convert it into a preferred_attributes_by_category signal instead
-
-
-7. preferred_attributes_by_category
-
-Infer preferred attributes for EACH relevant category.
-
-These are NOT hard filters.
-
-They are ranking signals used to score products.
-
-When multiple categories are relevant, return preferences for every category.
-
-Structure:
-
-{
-  \"Phones\": {},
-  \"Tablets\": {},
-  \"Computers\": {}
-}
-
-Only include categories that appear in:
-
-- primary
-- alternatives
-
-STRICT RULE:
-
-preferred_attributes_by_category MUST ONLY contain:
-- normalized technical values
-- no descriptive words
-- no marketing language
-- no subjective terms
-
-
-8. priority_features
-
-priority_features MUST describe user intent only.
-
-For examples:
--programming
--gaming
--video_editing
--content_creation
--photography
--business
--school
--travel
--battery_focused
--heavy_compute
--entertainment
--office_use
-
-DO NOT map these to attributes.
-
-Do NOT invent new values.
-
-Do NOT return:
-- performance
-- powerful
-- strong
-- fast
-- good battery
-- good camera
-
-Mapping is handled by backend system only.
-
-9. search_keywords
-
-Generate useful search keywords that can help find matching products.
-
-10. Examples of FULL INTENT EXTRACTION
-
-Example 1:
-
-USER:
-I need a laptop with HDMI for programming
-
-OUTPUT:
-
-{
-  \"category\": \"Computers\",
-  \"brand\": null,
-  \"use_case\": \"Programming\",
-  \"budget_max\": null,
-  \"budget_tier\": null,
-
-  \"required_attributes\": {
-    \"ports\": \"hdmi\"
-  },
-
-  \"preferred_attributes_by_category\": {
-    \"Computers\": {
-      \"ram\": \"16gb\",
-      \"storage\": \"512gb ssd\"
+        return $this->callModel($prompt);
     }
-  },
 
-  \"priority_features\": [
-    \"performance\",
-    \"battery life\",
-    \"keyboard quality\"
-  ],
 
-  \"search_keywords\": [
-    \"programming\",
-    \"hdmi\",
-    \"ssd\"
-  ]
-}
+    /**
+     * Build the main intent extraction prompt.
+     */
+    private function buildIntentPrompt(
+        string $query,
+        array $catalog
+    ): string {
 
-Example 2:
+        return "
+You are SmartCart's ecommerce shopping intent extraction engine.
 
-USER:
-I'm a content creator. What devices do you have for me?
+Your ONLY job is to understand the customer's shopping request
+and convert it into structured JSON.
 
-OUTPUT:
+You are NOT recommending products.
+
+The SmartCart catalog below is the authoritative source of truth.
+
+==================================================
+CURRENT SMARTCART CATALOG
+==================================================
+
+" . $this->catalogPromptText($catalog) . "
+
+==================================================
+CRITICAL CATALOG RULES
+==================================================
+
+1. CATEGORY NAMES
+
+- category.primary MUST be either null or EXACTLY one value from
+  CURRENT CATEGORIES.
+
+- category.alternatives may ONLY contain exact values from
+  CURRENT CATEGORIES.
+
+- Never shorten a category name.
+- Never rename a category.
+- Never substitute a synonym.
+- Never singularize or pluralize a category.
+- Never invent a category.
+
+For example, if the current catalog contains a category whose exact
+name describes smartphones, laptops, audio equipment, or another
+product type, return the EXACT catalog string shown above.
+
+Do not return your own shorter or more familiar version of that name.
+
+
+2. BRAND
+
+- Return a brand ONLY when the user explicitly requests or mentions it.
+- The brand MUST exactly match one value from CURRENT BRANDS.
+- Otherwise return null.
+- Never invent a brand.
+
+
+3. REQUIRED ATTRIBUTES
+
+required_attributes represents HARD product requirements.
+
+Only put something here when the user explicitly requires it.
+
+Examples of explicit requirements include statements such as:
+
+- at least a specific amount of RAM
+- a specific storage requirement
+- a required port
+- a required network capability
+- a specific processor
+- a specific measurable technical specification
+
+Attribute names MUST exactly match an attribute available for the
+selected category.
+
+Never invent attribute names.
+
+Preserve measurable values in a simple technical form.
+
+Examples:
+
+\"16 GB\"
+\"512 GB\"
+\"5G\"
+\"HDMI\"
+\"120 Hz\"
+
+Do NOT place vague requirements such as:
+
+\"good\"
+\"fast\"
+\"powerful\"
+\"strong\"
+\"long lasting\"
+\"high quality\"
+
+inside required_attributes.
+
+
+4. PREFERRED ATTRIBUTES
+
+preferred_attributes_by_category contains SOFT technical preferences.
+
+Only use an attribute when:
+
+- that exact attribute exists for the relevant category, AND
+- the user's request provides enough information to infer a meaningful
+  technical preference.
+
+Do NOT invent arbitrary numeric specifications.
+
+For example:
+
+If the customer says:
+
+\"I want a good phone for photography\"
+
+do NOT invent:
+
+\"Rear Camera\": \"48 MP\"
+
+unless the customer actually requested 48 MP.
+
+Photography should instead be represented through use_case and/or
+priority_features.
+
+If there is no useful explicit technical preference for a category,
+use an empty object for that category.
+
+If the customer explicitly requests a technical requirement but there is
+no semantically appropriate attribute for that requirement in the selected
+category:
+
+- DO NOT force the requirement into an unrelated existing attribute.
+- DO NOT choose the closest-looking attribute merely because it exists.
+- Leave that requirement out of required_attributes.
+- Preserve it in search_keywords instead.
+
+Attribute meaning must remain semantically correct.
+
+For example, a network capability must not be placed inside an unrelated
+charging, battery, display, camera, storage, or other attribute.
+
+5. USE CASE
+
+use_case should briefly describe the customer's primary intended use.
+
+Examples of concepts include:
+
+Gaming
+Programming
+Business
+School
+Content Creation
+Video Editing
+Photography
+Music
+Fitness
+Entertainment
+Travel
+Home Use
+Office Use
+Everyday Use
+
+Use the closest concise description.
+
+If no use case is expressed, return null.
+
+
+6. BUDGET
+
+budget_max:
+
+Extract the maximum numeric budget when the customer provides one.
+
+Examples:
+
+\"under 50000\" -> 50000
+\"below 80000\" -> 80000
+\"up to 120k\" -> 120000
+
+Otherwise return null.
+
+
+budget_tier:
+
+Use one of:
+
+\"Budget\"
+\"Mid Range\"
+\"Premium\"
+
+ONLY when the user's wording clearly indicates a tier.
+
+Do not guess a tier merely from budget_max.
+
+Otherwise return null.
+
+
+7. PRIORITY FEATURES
+
+priority_features describes important shopping goals that should
+influence product ranking.
+
+Use short normalized concepts such as:
+
+\"gaming\"
+\"programming\"
+\"video_editing\"
+\"content_creation\"
+\"photography\"
+\"business\"
+\"school\"
+\"travel\"
+\"battery_focused\"
+\"heavy_compute\"
+\"entertainment\"
+\"office_use\"
+
+Only include concepts supported by the user's request.
+
+Do not invent unrelated priorities.
+
+When the user's stated use case directly corresponds to one of the supported
+priority_features, include that priority feature as well.
+
+Examples:
+Photography -> photography
+Gaming -> gaming
+Programming -> programming
+Video Editing -> video_editing
+Content Creation -> content_creation
+Business -> business
+School -> school
+
+8. SEARCH KEYWORDS
+
+search_keywords should contain a small number of useful phrases
+representing the customer's request.
+
+They are ranking/search signals, NOT hard requirements.
+
+Avoid duplicating every attribute already represented in
+required_attributes.
+
+Keep them concise.
+
+
+9. MULTI-CATEGORY REQUESTS
+
+Use alternative categories only when the customer's request could
+genuinely be satisfied by multiple CURRENT categories.
+
+Do not add alternatives simply to increase the number of results.
+
+For a clearly specific product request, normally return one primary
+category and no alternatives.
+
+
+==================================================
+OUTPUT STRUCTURE
+==================================================
+
+Return ONLY valid JSON using exactly this structure:
 
 {
   \"category\": {
-    \"primary\": \"Phones\",
-    \"alternatives\": [
-      \"Tablets\",
-      \"Computers\"
-    ]
+    \"primary\": null,
+    \"alternatives\": []
   },
-
   \"brand\": null,
-  \"use_case\": \"Content Creation\",
+  \"use_case\": null,
   \"budget_max\": null,
-  \"budget_tier\": \"Mid Range\",
-
+  \"budget_tier\": null,
   \"required_attributes\": {},
-
-  \"preferred_attributes_by_category\": {
-
-    \"Phones\": {
-      \"camera_rear\": \"48mp\",
-      \"video_recording\": \"4k\",
-      \"battery\": \"5000mah\"
-    },
-
-    \"Tablets\": {
-      \"display\": \"fhd\",
-      \"battery\": \"5000mah\"
-    },
-
-    \"Computers\": {
-      \"ram\": \"16gb\",
-      \"graphics\": \"rtx\",
-      \"display\": \"color accurate\"
-    }
-  },
-
-  \"priority_features\": [
-    \"camera quality\",
-    \"video recording\",
-    \"battery life\"
-  ],
-
-  \"search_keywords\": [
-    \"content creation\",
-    \"camera\",
-    \"video\"
-  ]
+  \"preferred_attributes_by_category\": {},
+  \"priority_features\": [],
+  \"search_keywords\": []
 }
 
+Do not return markdown.
+Do not wrap JSON in code blocks.
+Do not explain your answer.
 
-ATTRIBUTE NORMALIZATION RULE:
-
-You MUST normalize all attributes into consistent technical values.
-
-DO NOT use vague phrases like:
-- \"high resolution\"
-- \"long battery\"
-- \"good camera\"
-- \"fast performance\"
-
-Instead use structured values:
-
-DISPLAY:
-- \"fhd\"
-- \"2k\"
-- \"4k\"
-
-BATTERY:
-For required_attributes:
-- ONLY extract battery if numeric value is explicitly mentioned (e.g. \"5000mah\")
-
-If user does NOT specify a number:
-- DO NOT output battery in required_attributes
-
-Instead:
-- put battery expectations into priority_features only
-
-CAMERA:
-- megapixels only (e.g. \"48mp\", \"108mp\")
-
-RAM:
-- \"4gb\", \"8gb\", \"16gb\"
-
-STORAGE:
-- \"128gb\", \"256gb\", \"512gb\"
-
-GRAPHICS:
-- \"integrated\", \"rtx\", \"radeon\"
-
-WATER RESISTANCE:
-- true / false only
-
-
-ATTRIBUTE NAME RULE:
-
-When generating:
-
-- required_attributes
-- preferred_attributes_by_category
-
-You MUST use attribute names from the selected category's attribute list - AVAILABLE ATTRIBUTES BY CATEGORY section.
-
-DO NOT invent attribute names.
-
-BAD:
-
-{
-  \"performance\": \"high\"
-}
-
-{
-  \"camera_quality\": \"high\"
-}
-
-{
-  \"battery_strength\": \"high\"
-}
-
-GOOD:
-
-{
-  \"RAM\": \"16 GB\"
-}
-
-{
-  \"Processor\": \"Intel Core i7\"
-}
-
-{
-  \"Storage\": \"512 GB\"
-}
-
-If a user request refers to a concept that does not exist as an attribute name:
-
-DO NOT create a new attribute.
-
-Instead place it in:
-
-priority_features or search_keywords.
-
-Example:
-Computers attributes:
-
-- Processor
-- RAM
-- Storage
-- Battery
-
-User:
-Laptop for programming
-
-GOOD:
-
-{
-  \"preferred_attributes_by_category\": {
-    \"Computers\": {
-      \"Processor\": \"Intel Core i7\",
-      \"RAM\": \"16 GB\"
-    }
-  }
-}
-
-BAD:
-
-{
-  \"preferred_attributes_by_category\": {
-    \"Computers\": {
-      \"performance\": \"high\"
-    }
-  }
-}
-
-
-
-
-ATTRIBUTE CLASSIFICATION RULE:
-
-Hard filters (required_attributes):
-- exact specs user explicitly demands
-- numbers, ports, storage, RAM, CPU type
-- boolean constraints
-
-Soft signals (preferred_attributes_by_category):
-- performance expectations
-- battery strength
-- camera quality
-- display quality
-
-If uncertain → ALWAYS treat as preferred attribute, NOT required
-If a user says \"strong\", \"good\", \"best\", \"long\", \"fast\" → NEVER put in required_attributes. Always convert to preferred_attributes_by_category or priority_features.
-
-
-USER QUERY:
+==================================================
+USER QUERY
+==================================================
 
 {$query}
 ";
-
-       $response = Http::withToken(config('services.replicate.token'))
-    ->post(
-        'https://api.replicate.com/v1/models/openai/gpt-4o-mini/predictions',
-        [
-            'input' => [
-                'prompt' => $prompt,
-                'system_prompt' => $systemPrompt,
-                'max_tokens' => 400,
-                'temperature' => 0.2,
-            ]
-        ]
-    );
-sleep(7); // initial wait before polling    
-$prediction = $response->json();
-
-$getUrl = $prediction['urls']['get'];
-
-$status = $prediction['status'];
-
-while (in_array($status, ['starting', 'processing'])) {
-
-    sleep(1);
-
-    $poll = Http::withToken(config('services.replicate.token'))
-        ->get($getUrl);
-
-    $prediction = $poll->json();
-
-    $status = $prediction['status'];
-}
-
-$output = $prediction['output'] ?? null;
+    }
 
 
-$text = is_array($output)
-    ? implode('', $output)
-    : $output;
+    /**
+     * Convert the live catalog into prompt-friendly text.
+     */
+    private function catalogPromptText(array $catalog): string
+    {
+        $text = "CURRENT CATEGORIES:\n";
 
-$decoded = json_decode(trim($text), true);
+        foreach ($catalog['categories'] as $category) {
+            $text .= "- {$category}\n";
+        }
 
-return is_array($decoded)
-    ? $decoded
-    : [
-        'category' => null,
-        'brand' => null,
-        'use_case' => null,
-        'budget_max' => null,
-        'budget_tier' => null,
-        'min_specs' => [
-            'ram' => null,
-            'storage' => null,
-        ],
-        'recommended_specs' => [
-            'ram' => null,
-            'storage' => null,
-        ],
-        'priority_features' => [],
-        'search_keywords' => [],
-    ];
+        $text .= "\nCURRENT BRANDS:\n";
 
+        foreach ($catalog['brands'] as $brand) {
+            $text .= "- {$brand}\n";
+        }
 
-    if ($status === 'failed') {
-    return [
-        'category' => null,
-        'brand' => null,
-        'use_case' => null,
-        'budget_max' => null,
-        'budget_tier' => null,
-        'min_specs' => [
-            'ram' => null,
-            'storage' => null,
-        ],
-        'recommended_specs' => [
-            'ram' => null,
-            'storage' => null,
-        ],
-        'priority_features' => [],
-        'search_keywords' => [],
-    ];
-}
+        $text .= "\nCURRENT ATTRIBUTES BY CATEGORY:\n";
+
+        foreach ($catalog['attributes'] as $category => $attributes) {
+
+            $text .= "\n{$category}:\n";
+
+            if (empty($attributes)) {
+                $text .= "- No attributes currently available\n";
+                continue;
+            }
+
+            foreach ($attributes as $attribute) {
+                $text .= "- {$attribute}\n";
+            }
+        }
+
+        return $text;
+    }
 
 
+    /**
+     * Validate AI output against the current database vocabulary.
+     *
+     * This does NOT contain category mappings or aliases.
+     */
+    private function validateIntent(
+        array $intent,
+        array $catalog
+    ): array {
 
+        $errors = [];
+
+        /*
+        |--------------------------------------------------------------------------
+        | BASIC STRUCTURE
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            !isset($intent['category']) ||
+            !is_array($intent['category'])
+        ) {
+            $errors[] = 'category must be an object containing primary and alternatives.';
+        }
+
+        $primary = $intent['category']['primary'] ?? null;
+
+        $alternatives = $intent['category']['alternatives'] ?? [];
+
+        if (!is_array($alternatives)) {
+            $errors[] = 'category.alternatives must be an array.';
+            $alternatives = [];
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CATEGORY
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $primary !== null &&
+            !in_array($primary, $catalog['categories'], true)
+        ) {
+            $errors[] =
+                "Invalid primary category '{$primary}'. It must exactly match a current category.";
+        }
+
+        foreach ($alternatives as $category) {
+
+            if (!in_array($category, $catalog['categories'], true)) {
+
+                $errors[] =
+                    "Invalid alternative category '{$category}'. It must exactly match a current category.";
+            }
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | BRAND
+        |--------------------------------------------------------------------------
+        */
+
+        $brand = $intent['brand'] ?? null;
+
+        if (
+            $brand !== null &&
+            !in_array($brand, $catalog['brands'], true)
+        ) {
+            $errors[] =
+                "Invalid brand '{$brand}'. It must exactly match a current brand.";
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | REQUIRED ATTRIBUTES
+        |--------------------------------------------------------------------------
+        */
+
+        $requiredAttributes =
+            $intent['required_attributes'] ?? [];
+
+        if (!is_array($requiredAttributes)) {
+
+            $errors[] =
+                'required_attributes must be an object.';
+
+        } elseif ($primary) {
+
+            $availableAttributes =
+                $catalog['attributes'][$primary] ?? [];
+
+            foreach ($requiredAttributes as $name => $value) {
+
+                if (!in_array($name, $availableAttributes, true)) {
+
+                    $errors[] =
+                        "Invalid required attribute '{$name}' for category '{$primary}'.";
+                }
+            }
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PREFERRED ATTRIBUTES
+        |--------------------------------------------------------------------------
+        */
+
+        $preferences =
+            $intent['preferred_attributes_by_category'] ?? [];
+
+        if (!is_array($preferences)) {
+
+            $errors[] =
+                'preferred_attributes_by_category must be an object.';
+
+        } else {
+
+            $allowedCategories = array_values(
+                array_filter(
+                    array_merge(
+                        [$primary],
+                        $alternatives
+                    )
+                )
+            );
+
+            foreach ($preferences as $category => $attributes) {
+
+                if (!in_array($category, $allowedCategories, true)) {
+
+                    $errors[] =
+                        "Preferred attributes contain unrelated category '{$category}'.";
+
+                    continue;
+                }
+
+                if (!is_array($attributes)) {
+
+                    $errors[] =
+                        "Preferred attributes for '{$category}' must be an object.";
+
+                    continue;
+                }
+
+                $availableAttributes =
+                    $catalog['attributes'][$category] ?? [];
+
+                foreach ($attributes as $name => $value) {
+
+                    if (!in_array($name, $availableAttributes, true)) {
+
+                        $errors[] =
+                            "Invalid preferred attribute '{$name}' for category '{$category}'.";
+                    }
+                }
+            }
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | BUDGET
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            isset($intent['budget_max']) &&
+            $intent['budget_max'] !== null &&
+            !is_numeric($intent['budget_max'])
+        ) {
+            $errors[] =
+                'budget_max must be numeric or null.';
+        }
+
+
+        return [
+            'valid' => empty($errors),
+            'errors' => $errors,
+        ];
+    }
+
+
+    /**
+     * Normalize the final intent into one predictable schema.
+     */
+    private function normalizeIntent(array $intent): array
+    {
+        return [
+            'category' => [
+                'primary' =>
+                    $intent['category']['primary'] ?? null,
+
+                'alternatives' =>
+                    array_values(
+                        array_unique(
+                            $intent['category']['alternatives'] ?? []
+                        )
+                    ),
+            ],
+
+            'brand' =>
+                $intent['brand'] ?? null,
+
+            'use_case' =>
+                $intent['use_case'] ?? null,
+
+            'budget_max' =>
+                isset($intent['budget_max']) &&
+                is_numeric($intent['budget_max'])
+                    ? (float) $intent['budget_max']
+                    : null,
+
+            'budget_tier' =>
+                $intent['budget_tier'] ?? null,
+
+            'required_attributes' =>
+                is_array($intent['required_attributes'] ?? null)
+                    ? $intent['required_attributes']
+                    : [],
+
+            'preferred_attributes_by_category' =>
+                is_array(
+                    $intent['preferred_attributes_by_category'] ?? null
+                )
+                    ? $intent['preferred_attributes_by_category']
+                    : [],
+
+            'priority_features' =>
+                is_array($intent['priority_features'] ?? null)
+                    ? array_values(
+                        array_unique($intent['priority_features'])
+                    )
+                    : [],
+
+            'search_keywords' =>
+                is_array($intent['search_keywords'] ?? null)
+                    ? array_values(
+                        array_unique($intent['search_keywords'])
+                    )
+                    : [],
+        ];
+    }
+
+
+    /**
+     * Send a prompt to Replicate and return decoded JSON.
+     */
+    private function callModel(string $prompt): ?array
+    {
+        try {
+
+            $response = Http::withToken(
+                config('services.replicate.token')
+            )
+                ->timeout(30)
+                ->post(self::MODEL_URL, [
+                    'input' => [
+                        'prompt' => $prompt,
+
+                        'system_prompt' =>
+                            'You are SmartCart AI. Return ONLY valid JSON. Never invent catalog values.',
+
+                        'max_tokens' => 500,
+                        'temperature' => 0.1,
+                    ],
+                ]);
+
+            if (!$response->successful()) {
+
+                Log::error('SmartCart AI intent request failed.', [
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+
+                return null;
+            }
+
+            $prediction = $response->json();
+
+            $getUrl = $prediction['urls']['get'] ?? null;
+            $status = $prediction['status'] ?? null;
+
+            if (!$getUrl) {
+
+                Log::error(
+                    'SmartCart AI intent response did not contain polling URL.'
+                );
+
+                return null;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | POLL PREDICTION
+            |--------------------------------------------------------------------------
+            */
+
+            for ($attempt = 0; $attempt < 15; $attempt++) {
+
+                if ($status === 'succeeded') {
+                    return $this->decodePrediction($prediction);
+                }
+
+                if (
+                    $status === 'failed' ||
+                    $status === 'canceled'
+                ) {
+
+                    Log::error(
+                        'SmartCart AI intent prediction failed.',
+                        [
+                            'status' => $status,
+                            'error' => $prediction['error'] ?? null,
+                        ]
+                    );
+
+                    return null;
+                }
+
+                sleep(1);
+
+                $pollResponse = Http::withToken(
+                    config('services.replicate.token')
+                )
+                    ->timeout(15)
+                    ->get($getUrl);
+
+                if (!$pollResponse->successful()) {
+
+                    Log::error(
+                        'SmartCart AI intent polling failed.',
+                        [
+                            'status' => $pollResponse->status(),
+                        ]
+                    );
+
+                    return null;
+                }
+
+                $prediction = $pollResponse->json();
+                $status = $prediction['status'] ?? null;
+            }
+
+            Log::warning(
+                'SmartCart AI intent prediction timed out.'
+            );
+
+            return null;
+
+        } catch (\Throwable $exception) {
+
+            Log::error(
+                'SmartCart AI intent exception.',
+                [
+                    'message' => $exception->getMessage(),
+                ]
+            );
+
+            return null;
+        }
+    }
+
+
+    /**
+     * Decode Replicate prediction output.
+     */
+    private function decodePrediction(array $prediction): ?array
+    {
+        $output = $prediction['output'] ?? null;
+
+        $text = is_array($output)
+            ? implode('', $output)
+            : $output;
+
+        if (!$text) {
+            return null;
+        }
+
+        $text = trim($text);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Defensive cleanup
+        |--------------------------------------------------------------------------
+        |
+        | The prompt tells the model not to use markdown fences, but removing
+        | them here protects us if it occasionally does.
+        |
+        */
+
+        $text = preg_replace(
+            '/^```(?:json)?\s*|\s*```$/i',
+            '',
+            $text
+        );
+
+        $decoded = json_decode(
+            trim($text),
+            true
+        );
+
+        if (!is_array($decoded)) {
+
+            Log::warning(
+                'SmartCart AI returned invalid JSON.',
+                [
+                    'output' => $text,
+                ]
+            );
+
+            return null;
+        }
+
+        return $decoded;
+    }
+
+
+    /**
+     * Safe intent returned when AI extraction cannot be completed.
+     */
+    private function emptyIntent(): array
+    {
+        return [
+            'category' => [
+                'primary' => null,
+                'alternatives' => [],
+            ],
+            'brand' => null,
+            'use_case' => null,
+            'budget_max' => null,
+            'budget_tier' => null,
+            'required_attributes' => [],
+            'preferred_attributes_by_category' => [],
+            'priority_features' => [],
+            'search_keywords' => [],
+        ];
     }
 }

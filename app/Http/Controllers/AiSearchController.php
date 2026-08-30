@@ -3,74 +3,86 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use App\Services\AiIntentService;
 use App\Services\ProductSearchService;
-use App\Services\IntentValidationService;
 use App\Services\AiExplanationService;
 
 class AiSearchController extends Controller
 {
-    protected $aiIntentService;
-    protected $productSearchService;
-    protected $intentValidationService;
-    protected $aiExplanationService;
-
     public function __construct(
-        AiIntentService $aiIntentService,
-        ProductSearchService $productSearchService,
-        IntentValidationService $intentValidationService,
-        AiExplanationService $aiExplanationService
+        protected AiIntentService $aiIntentService,
+        protected ProductSearchService $productSearchService,
+        protected AiExplanationService $aiExplanationService
     ) {
-        $this->aiIntentService = $aiIntentService;
-        $this->productSearchService = $productSearchService;
-        $this->intentValidationService = $intentValidationService;
-        $this->aiExplanationService = $aiExplanationService;
     }
 
     public function search(Request $request)
     {
-        $query = $request->input('query');
+        /*
+        |--------------------------------------------------------------------------
+        | 1. VALIDATE QUERY
+        |--------------------------------------------------------------------------
+        */
 
-        if (!$query) {
-            return back()->with('error', 'Please enter a search query.');
+        $query = trim((string) $request->input('query'));
+
+        if ($query === '') {
+            return response()->json([
+                'message' => 'Please enter a search query.',
+            ], 422);
         }
 
-        // =========================
-        // 1. EXTRACT INTENT (AI)
-        // =========================
+        /*
+        |--------------------------------------------------------------------------
+        | 2. EXTRACT + VALIDATE INTENT
+        |--------------------------------------------------------------------------
+        |
+        | AiIntentService now handles:
+        | - intent extraction
+        | - catalog validation
+        | - one AI correction attempt when necessary
+        | - normalization
+        |
+        */
+
         $intent = $this->aiIntentService->extractIntent($query);
 
-        // =========================
-        // 2. VALIDATE INTENT
-        // =========================
-       // $validatedIntent = $this->intentValidationService->validate($intent);
+        /*
+        |--------------------------------------------------------------------------
+        | 3. SEARCH + RANK PRODUCTS
+        |--------------------------------------------------------------------------
+        */
 
-        // =========================
-        // 3. SEARCH PRODUCTS
-        // =========================
         $products = $this->productSearchService->search($intent);
 
-        // =========================
-        // 4. AI EXPLANATION
-        // =========================
+        /*
+        |--------------------------------------------------------------------------
+        | 4. GENERATE BUYING EXPLANATION
+        |--------------------------------------------------------------------------
+        |
+        | Only the top 3 ranked products are sent to the explanation AI.
+        | AiExplanationService handles empty results itself.
+        |
+        */
+
         $aiExplanation = $this->aiExplanationService->generate(
             $query,
             $intent,
-            $products->take(3) 
+            $products->take(3)
         );
 
-        // =========================
-        // 5. RETURN RESULTS
-        // =========================
-       
- return response()->json([
-    'query' => $query,
-    'intent' => $intent,
-    'products' => $products,
-    'ai_explanation' => $aiExplanation['ai_explanation'],
-    'refinement_suggestions' => $aiExplanation['refinement_suggestions'],
-]);
+        /*
+        |--------------------------------------------------------------------------
+        | 5. RETURN RESULTS
+        |--------------------------------------------------------------------------
+        */
 
+        return response()->json([
+            'query' => $query,
+            'intent' => $intent,
+            'products' => $products,
+            'ai_explanation' => $aiExplanation['ai_explanation'],
+            'refinement_suggestions' => $aiExplanation['refinement_suggestions'],
+        ]);
     }
 }
