@@ -6,128 +6,204 @@ use Illuminate\Support\Facades\Http;
 
 class ReplicateService
 {
-    protected $baseUrl = 'https://api.replicate.com/v1';
+    protected string $baseUrl = 'https://api.replicate.com/v1';
 
     /**
-     * CREATE PREDICTION
+     * Create a new AI prediction.
      */
-   public function generate($prompt)
-{
-    $response = Http::withToken(
-        config('services.replicate.token')
-    )->post(
-        "{$this->baseUrl}/predictions",
-        [
-            'version' => 'openai/gpt-4o-mini',
-
-            'input' => [
-                'prompt' => $prompt,
-                'system_prompt' => 'You are an expert ecommerce AI product comparison engine that returns only professional markdown.',
-                'max_tokens' => 1500,
-                'temperature' => 0.5,
-            ]
-        ]
-    );
-
-    $data = $response->json();
-
-   
-logger('REPLICATE RESPONSE', $response->json());
-
-
-
-    if (!isset($data['id'])) {
-
-        throw new \Exception(
-            json_encode($data)
-        );
-    }
-
-    return $data['id'];
-}
-
-    /**
-     * WAIT FOR FINAL RESULT
-     */
-    public function waitForResult($id)
+    public function generate(string $prompt): string
     {
-        $maxAttempts = 60;
+        $token = config('services.replicate.token');
 
-        for ($i = 0; $i < $maxAttempts; $i++) {
+        if (empty($token)) {
+            throw new \Exception(
+                'Replicate API token is not configured.'
+            );
+        }
 
-            $response = Http::withToken(
-                config('services.replicate.token')
-            )->get(
-                "{$this->baseUrl}/predictions/{$id}"
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->timeout(30)
+            ->post(
+                "{$this->baseUrl}/predictions",
+                [
+                    'version' => 'openai/gpt-4o-mini',
+
+                    'input' => [
+                        'prompt' => $prompt,
+
+                        'system_prompt' =>
+                            'You are SmartCart AI, an ecommerce product comparison assistant. Use only the supplied catalog data. Never invent product facts or unsupported performance claims. Return only professional Markdown.',
+
+                        'max_tokens' => 1500,
+
+                        'temperature' => 0.2,
+                    ],
+                ]
             );
 
-            $data = $response->json();
+        /*
+        |--------------------------------------------------------------------------
+        | Validate API response
+        |--------------------------------------------------------------------------
+        */
 
-            // SUCCESS
-            if (($data['status'] ?? null) === 'succeeded') {
+        if (!$response->successful()) {
+            throw new \Exception(
+                "Replicate request failed with status {$response->status()}: "
+                . $response->body()
+            );
+        }
 
-                return $this->extractOutput($data);
-            }
+        $data = $response->json();
 
-            // FAILED
-            if (($data['status'] ?? null) === 'failed') {
+        $predictionId = $data['id'] ?? null;
 
+        if (!$predictionId) {
+            throw new \Exception(
+                'Replicate did not return a prediction ID.'
+            );
+        }
+
+        return $predictionId;
+    }
+
+    /**
+     * Wait for the prediction to finish.
+     */
+    public function waitForResult(string $id): string
+    {
+        $token = config('services.replicate.token');
+
+        if (empty($token)) {
+            throw new \Exception(
+                'Replicate API token is not configured.'
+            );
+        }
+
+        $maxAttempts = 60;
+
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Wait before polling
+            |--------------------------------------------------------------------------
+            */
+
+            sleep(2);
+
+            $response = Http::withToken($token)
+                ->acceptJson()
+                ->timeout(30)
+                ->get(
+                    "{$this->baseUrl}/predictions/{$id}"
+                );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Validate polling response
+            |--------------------------------------------------------------------------
+            */
+
+            if (!$response->successful()) {
                 throw new \Exception(
-                    $data['error'] ?? 'Prediction failed'
+                    "Replicate polling failed with status {$response->status()}: "
+                    . $response->body()
                 );
             }
 
-            // WAIT
-            sleep(2);
+            $data = $response->json();
+
+            $status = $data['status'] ?? null;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Prediction completed
+            |--------------------------------------------------------------------------
+            */
+
+            if ($status === 'succeeded') {
+                return $this->extractOutput($data);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Prediction failed
+            |--------------------------------------------------------------------------
+            */
+
+            if ($status === 'failed') {
+                throw new \Exception(
+                    $data['error'] ?? 'Replicate prediction failed.'
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Prediction canceled
+            |--------------------------------------------------------------------------
+            */
+
+            if ($status === 'canceled') {
+                throw new \Exception(
+                    'Replicate prediction was canceled.'
+                );
+            }
         }
 
-        throw new \Exception('AI response timeout');
+        throw new \Exception(
+            'AI comparison timed out while waiting for Replicate.'
+        );
     }
 
     /**
-     * EXTRACT CLEAN OUTPUT
+     * Extract the final text returned by Replicate.
      */
-    /**
+    private function extractOutput(array $data): string
+    {
+        $output = $data['output'] ?? null;
 
-* EXTRACT CLEAN OUTPUT
-  */
-
-private function extractOutput($data)
-{
-    // DEBUG THE FULL RESPONSE
-    logger('FULL REPLICATE RESPONSE', $data);
-
-    $output = $data['output'] ?? null;
-
-    if (!$output) {
-
-        // Sometimes output may not exist directly
-        if (isset($data['prediction']['output'])) {
-            $output = $data['prediction']['output'];
+        if (empty($output)) {
+            throw new \Exception(
+                'Replicate completed successfully but returned no AI output.'
+            );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Replicate may return streamed text chunks
+        |--------------------------------------------------------------------------
+        */
+
+        if (is_array($output)) {
+            $output = implode('', $output);
+        }
+
+        $output = trim((string) $output);
+
+        if ($output === '') {
+            throw new \Exception(
+                'Replicate returned an empty AI comparison.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Defensive Markdown cleanup
+        |--------------------------------------------------------------------------
+        |
+        | The prompt requests raw Markdown, but remove code fences if the model
+        | adds them anyway.
+        |
+        */
+
+        $output = preg_replace(
+            '/^```(?:markdown|md)?\s*|\s*```$/i',
+            '',
+            $output
+        );
+
+        return trim($output);
     }
-
-    if (!$output) {
-        throw new \Exception('No AI output returned');
-    }
-
-    // Convert array chunks to string
-    if (is_array($output)) {
-        $output = implode('', $output);
-    }
-
-    $output = trim($output);
-
-    // Remove accidental code fences
-    $output = str_replace([
-        '```markdown',
-        '```md',
-        '```'
-    ], '', $output);
-
-    return trim($output);
-}
-
-
-
 }

@@ -5,7 +5,6 @@ namespace App\Jobs;
 use App\Models\AiComparison;
 use App\Models\Product;
 use App\Services\Ai\ReplicateService;
-
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -25,304 +24,401 @@ class GenerateAiComparison implements ShouldQueue
 
     public function handle(ReplicateService $ai)
     {
-        // FIND COMPARISON
         $comparison = AiComparison::find($this->comparisonId);
 
         if (!$comparison) {
             return;
         }
 
-        // UPDATE STATUS
         $comparison->update([
-            'status' => 'processing'
+            'status' => 'processing',
+            'error' => null,
         ]);
 
         try {
+            /*
+            |--------------------------------------------------------------------------
+            | FETCH PRODUCTS
+            |--------------------------------------------------------------------------
+            */
 
-            // FETCH PRODUCTS
             $products = Product::with([
                 'attributes',
                 'brand',
-                'category'
+                'category',
             ])
-            ->whereIn('id', $comparison->product_ids)
-            ->get();
+                ->whereIn('id', $comparison->product_ids)
+                ->get();
 
-            // BUILD PROMPT
+            /*
+            |--------------------------------------------------------------------------
+            | VALIDATE PRODUCTS
+            |--------------------------------------------------------------------------
+            |
+            | The comparison record should always contain exactly two products.
+            | We check again here because queued jobs may execute later.
+            |
+            */
+
+            if ($products->count() !== 2) {
+                throw new \Exception(
+                    'Exactly two valid products are required for comparison.'
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | BUILD PROMPT
+            |--------------------------------------------------------------------------
+            */
+
             $prompt = $this->buildPrompt($products);
 
-            // GENERATE AI
+            /*
+            |--------------------------------------------------------------------------
+            | GENERATE AI COMPARISON
+            |--------------------------------------------------------------------------
+            */
+
             $predictionId = $ai->generate($prompt);
 
-           
-
-            // GET RESULT
             $result = $ai->waitForResult($predictionId);
 
-            // SAVE RESULT
+            /*
+            |--------------------------------------------------------------------------
+            | SAVE RESULT
+            |--------------------------------------------------------------------------
+            */
+
             $comparison->update([
                 'result' => $result,
-                'status' => 'completed'
+                'status' => 'completed',
+                'error' => null,
             ]);
 
-        } catch (\Exception $e) {
-
+        } catch (\Throwable $e) {
             $comparison->update([
                 'status' => 'failed',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-
         }
     }
 
+    /**
+     * Build the comparison prompt using only real catalog data.
+     */
+    private function buildPrompt($products): string
+    {
+        $productText = '';
 
-private function buildPrompt($products)
-{
-    $productText = '';
+        foreach ($products as $index => $product) {
+            $price = $this->effectivePrice($product);
 
-    foreach ($products as $index => $product) {
+            $productText .=
+                'Product ' . ($index + 1) . ":\n";
 
-        $productText .= "
-Product " . ($index + 1) . ":
-Name: {$product->name}
-Price: {$product->sale_price}
-Brand: {$product->brand->name}
-Category: {$product->category->name}
+            $productText .=
+                "Name: {$product->name}\n";
 
-Attributes:
-";
+            $productText .=
+                "Price: KES " . number_format($price, 2) . "\n";
 
-        foreach ($product->attributes as $attribute) {
+            $productText .=
+                "Brand: " . ($product->brand->name ?? 'Not provided') . "\n";
 
-            $productText .= "- {$attribute->attribute_name}: {$attribute->attribute_value}\n";
+            $productText .=
+                "Category: " . ($product->category->name ?? 'Not provided') . "\n";
+
+            $productText .= "Attributes:\n";
+
+            foreach ($product->attributes as $attribute) {
+                $productText .=
+                    "- {$attribute->attribute_name}: {$attribute->attribute_value}\n";
+            }
+
+            $productText .= "\n";
         }
 
-        $productText .= "\n";
-    }
+        return <<<PROMPT
+You are SmartCart AI, an ecommerce product comparison assistant.
 
-  
+Your job is to compare the TWO supplied products using ONLY the product
+information provided below.
 
-return "
-You are an advanced ecommerce AI comparison engine.
+You are NOT searching for products.
+You do NOT have permission to add missing product information.
+The SmartCart catalog data below is the source of truth.
 
-Your job is to compare products intelligently based on:
+=====================================================
+PRODUCT DATA
+=====================================================
 
+{$productText}
+
+=====================================================
+CORE RULES
+=====================================================
+
+1. Use ONLY the supplied product data.
+
+2. Never invent or assume:
 - specifications
-- pricing
-- usability
-- quality
-- real-world experience
-- value for money
+- features
+- battery life
+- benchmark results
+- camera quality
+- display quality
+- build quality
+- durability
+- software compatibility
+- ports
+- upgradeability
+- performance results
+- product capabilities
+- warranty information
 
-You must behave like a professional ecommerce product analyst.
+unless that information is explicitly supported by the supplied data.
 
-=====================================================
-PRODUCTS
-=====================================================
+3. Do not use outside knowledge about these product models.
 
-$productText
+For example, do not assume something about a processor, phone, laptop,
+television, or other product simply because you recognize its model name.
 
-=====================================================
-IMPORTANT RULES
-=====================================================
-
-- Return ONLY clean Markdown
-- Do NOT return JSON
-- Do NOT return code blocks
-- Do NOT return explanations outside markdown
-- Be analytical and realistic
-- Never invent specifications
-- Base analysis ONLY on provided attributes
-- Mention both strengths and weaknesses honestly
-- Mention tradeoffs clearly
-- Avoid generic marketing language
-
-=====================================================
-IMPORTANT CATEGORY RULE
-=====================================================
-
-The comparison MUST adapt dynamically depending on the product category.
+4. You may describe factual differences that are directly visible in the data.
 
 Examples:
+- one product has more RAM
+- one product has more storage
+- one product has a larger battery capacity
+- one product has a larger display
+- one product has a different processor model
+- one product has different graphics
+- one product costs less
+- one product provides a listed feature that the other does not
 
-- Laptops:
-  performance, display, battery, portability
+5. Do NOT convert specifications into unsupported performance claims.
 
-- Washing machines:
-  capacity, efficiency, wash quality, noise
+For example:
 
-- Printers:
-  print quality, print speed, ink efficiency
+Allowed:
+"Product A has 16 GB RAM while Product B has 8 GB RAM."
 
-- TVs:
-  resolution, brightness, refresh rate, smart features
+Not allowed:
+"Product A is twice as fast."
 
-- Furniture:
-  comfort, materials, durability, size
+Allowed:
+"Product A lists a 5000 mAh battery while Product B lists 4500 mAh."
 
-- Phones:
-  camera, battery, performance, display
+Not allowed:
+"Product A lasts much longer."
 
-DO NOT force irrelevant comparison categories.
+Allowed:
+"Product A uses Processor X while Product B uses Processor Y."
+
+Not allowed:
+"Processor X is faster."
+
+unless the supplied product data directly supports that conclusion.
+
+6. If the supplied data is insufficient to determine a winner for a
+particular area, say so briefly or leave that comparison out.
+
+7. Do not manufacture numerical ratings or scores.
+
+Do NOT create arbitrary ratings such as:
+- 92/100 performance
+- 8.5/10 battery
+- 95% display quality
+
+The catalog does not provide those scores.
+
+8. A more expensive product is NOT automatically better.
+
+Use price together with the supplied specifications when discussing value.
+
+9. Mention meaningful tradeoffs honestly.
+
+10. Avoid generic marketing language.
 
 =====================================================
-MARKDOWN STRUCTURE
+CATEGORY ADAPTATION
 =====================================================
 
-Use markdown sections EXACTLY like this:
+Adapt the comparison dynamically to the actual products and the attributes
+that are available.
+
+Do NOT use a fixed comparison template for every product category.
+
+For example:
+
+For laptops, relevant supplied attributes might include:
+- processor
+- RAM
+- storage
+- graphics
+- display
+- battery
+- ports
+- operating system
+
+For phones, relevant supplied attributes might include:
+- processor
+- RAM
+- storage
+- display
+- cameras
+- battery
+- network
+- operating system
+
+For TVs, relevant supplied attributes might include:
+- display size
+- resolution
+- refresh rate
+- panel/display technology
+- connectivity
+
+These are examples only.
+
+Use ONLY comparison areas actually supported by the supplied product data.
+
+=====================================================
+OUTPUT FORMAT
+=====================================================
+
+Return ONLY clean Markdown.
+
+Do NOT return JSON.
+Do NOT use markdown code fences.
+Do NOT include text before or after the comparison.
+
+Use the following structure:
 
 # Overall Verdict
 
-Explain:
-- which product wins overall
-- why it wins
-- important tradeoffs
+Give a concise overall assessment.
 
-Example:
+If one product has a clearly stronger overall combination of supplied
+specifications and price, explain why using those facts.
 
-The **MacBook Air M3** is the better overall laptop because it offers excellent battery life, premium build quality, and strong real-world performance.
-
-The **ASUS TUF Gaming A15** is better for gaming and GPU-intensive workloads.
+If the supplied data does not support declaring one product the absolute
+winner, say that the better choice depends on the buyer's priorities and
+explain those priorities.
 
 ---
 
-#Score Comparison
+# Specification Comparison
 
-Create a markdown table.
+Create a Markdown table using the most useful attributes available for
+these products.
 
-Example:
+Example structure:
 
-| Category | Product A | Product B |
+| Specification | Product A | Product B |
 |---|---|---|
-| Performance | 89 | 93 |
-| Battery | 97 | 74 |
-| Display | 90 | 86 |
-| Value | 84 | 91 |
+| Price | ... | ... |
+| RAM | ... | ... |
+| Storage | ... | ... |
 
-Categories MUST adapt dynamically depending on the product type.
+Use the ACTUAL product names as the table column headings.
+
+Do not add specifications that are not present in the supplied data.
 
 ---
 
-#Strengths
+# Strengths
 
-Create strengths section for EACH product.
+Create a subsection for EACH product.
 
-Example:
+## Actual Product Name
 
-## Product Name
-- Strength 1
-- Strength 2
-- Strength 3
+List strengths that can be directly supported by its supplied
+specifications or price.
 
 ---
 
 # Weaknesses
 
-Create weaknesses section for EACH product.
+Create a subsection for EACH product.
 
-Example:
+## Actual Product Name
 
-## Product Name
-- Weakness 1
-- Weakness 2
+Mention meaningful disadvantages relative to the other product ONLY when
+the supplied data supports them.
+
+Do not invent weaknesses.
+
+If there is not enough information to identify a meaningful weakness,
+say that no clear weakness can be determined from the supplied data.
 
 ---
 
 # Best For
 
-Recommend products for different users.
+Explain which types of buyers may prefer each product based on the
+supplied differences.
 
-Examples:
-- Students
-- Professionals
-- Gamers
-- Families
-- Budget buyers
-- Travelers
+Keep these recommendations conservative.
 
-Use ONLY categories that make sense for the product type.
-
-Example:
-
-## Best For Students
-
-**Product Name**
-
-Reason why it fits students.
+Do not claim suitability for specialized tasks unless the supplied
+specifications reasonably support the recommendation.
 
 ---
 
 # Key Differences
 
-Mention major real-world differences.
+Explain the most important factual differences between the products.
 
-Examples:
-- Better battery
-- Better gaming performance
-- Better efficiency
-- Better build quality
-- Better value
-
-Explain WHY those differences matter.
+Focus on differences that could realistically affect a buying decision.
 
 ---
 
 # Buying Advice
 
-Provide practical buying advice.
+Finish with practical guidance.
 
-Example:
+Use a structure similar to:
 
-Choose Product A if:
-- portability matters most
-- battery life is important
-- you travel often
+Choose **Product A** if:
+- factual reason based on supplied data
+- factual reason based on supplied data
 
-Choose Product B if:
-- gaming matters most
-- maximum performance matters
-- upgradeability matters
+Choose **Product B** if:
+- factual reason based on supplied data
+- factual reason based on supplied data
 
-=====================================================
-SCORING RULES
-=====================================================
-
-Scores must:
-- be realistic
-- reflect actual differences
-- consider specifications
-- consider pricing
-- consider usability
-- consider value for money
-
-Do NOT give nearly identical scores unless products are genuinely similar.
+Do not introduce new product facts in this section.
 
 =====================================================
-VALUE FOR MONEY RULE
+FINAL CHECK
 =====================================================
 
-A more expensive product is NOT automatically better.
+Before returning the comparison, verify that:
 
-Determine whether:
-- extra features justify the extra cost
-- performance improvements are meaningful
-- cheaper options offer better overall value
+- every product fact came from PRODUCT DATA
+- every specification mentioned exists in PRODUCT DATA
+- no numerical rating was invented
+- no benchmark result was invented
+- no unsupported performance claim was made
+- no unsupported battery, camera, display, build-quality, or durability
+  claim was made
+- both products were compared fairly
+- the output contains only clean Markdown
+PROMPT;
+    }
 
-=====================================================
-FINAL RULES
-=====================================================
+    /**
+     * Return the actual selling price.
+     */
+    private function effectivePrice($product): float
+    {
+        if (
+            $product->sale_price !== null &&
+            (float) $product->sale_price > 0
+        ) {
+            return (float) $product->sale_price;
+        }
 
-- Return ONLY clean Markdown
-- Do NOT return JSON
-- Do NOT wrap markdown in code blocks
-- Do NOT return explanations outside markdown
-- Keep formatting professional and readable
-";
-
-
-
-
-}
-
-
+        return (float) $product->price;
+    }
 }
