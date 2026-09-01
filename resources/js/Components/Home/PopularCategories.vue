@@ -1,5 +1,5 @@
 <script setup>
-import { Link } from '@inertiajs/vue3'
+import { Link, router } from '@inertiajs/vue3'
 
 defineProps({
     categories: {
@@ -7,6 +7,20 @@ defineProps({
         default: () => [],
     },
 })
+
+
+
+const goToCategory = (category) => {
+    router.get(
+        '/productListing',
+        {
+            categories: [category.id],
+        },
+        {
+            preserveState: false,
+        }
+    )
+}
 </script>
 
 
@@ -65,11 +79,12 @@ defineProps({
         pb-2
     "
 >
-            <Link
+            <button
                 v-for="category in categories"
                 :key="category.id"
-                :href="`/productListing?category=${category.slug}`"
-                class="group"
+                @click="goToCategory(category)"
+                type="button"
+                class="group text-left"
             >
                 <div
                     class="
@@ -145,7 +160,7 @@ defineProps({
                     </div>
 
                 </div>
-            </Link>
+            </button>
         </div>
 
     </section>

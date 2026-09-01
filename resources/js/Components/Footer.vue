@@ -1,227 +1,255 @@
 <template>
     <footer
-        class="bg-blue-900
-               border-t
-               mt-10"
+        class="mt-10 border-t bg-blue-900"
     >
-
         <div
-            class="max-w-7xl
-                   mx-auto
-                   px-4
-                   sm:px-6
-                   lg:px-8
-                   py-8
-                   grid
-                   grid-cols-2
-                   md:grid-cols-4
-                   gap-6
-                   text-sm
-                   text-white"
+            class="
+                mx-auto
+                grid
+                max-w-7xl
+                grid-cols-1
+                gap-8
+                px-4
+                py-10
+                text-sm
+                text-white
+                sm:grid-cols-2
+                sm:px-6
+                lg:grid-cols-4
+                lg:px-8
+            "
         >
 
-            <!-- SHOP -->
+            <!-- ========================================================= -->
+            <!-- SMARTCART -->
+            <!-- ========================================================= -->
 
             <div>
-
                 <h3
-                    class="font-semibold
-                           text-white
-                           mb-2"
+                    class="
+                        mb-3
+                        text-lg
+                        font-bold
+                        text-white
+                    "
+                >
+                    SmartCart
+                </h3>
+
+                <p
+                    class="
+                        max-w-xs
+                        leading-6
+                        text-blue-100
+                    "
+                >
+                    A demo e-commerce platform with AI-powered product
+                    search and intelligent product comparison.
+                </p>
+            </div>
+
+
+            <!-- ========================================================= -->
+            <!-- SHOP -->
+            <!-- ========================================================= -->
+
+            <div>
+                <h3
+                    class="
+                        mb-3
+                        font-semibold
+                        text-white
+                    "
                 >
                     Shop
                 </h3>
 
                 <ul
-                    class="space-y-1
-                           text-blue-100"
+                    class="
+                        space-y-2
+                        text-blue-100
+                    "
                 >
-
                     <li>
                         <a
                             href="/productListing"
-                            class="hover:text-white
-                                   transition"
+                            class="
+                                transition
+                                hover:text-white
+                            "
                         >
-                            Products
+                            All Products
                         </a>
                     </li>
 
                     <li>
                         <a
-                            href="#"
-                            class="hover:text-white
-                                   transition"
+                            href="/productListing?sort=newest"
+                            class="
+                                transition
+                                hover:text-white
+                            "
                         >
-                            Categories
+                            New Arrivals
                         </a>
                     </li>
-
-                    <li>
-                        <a
-                            href="#"
-                            class="hover:text-white
-                                   transition"
-                        >
-                            Deals
-                        </a>
-                    </li>
-
                 </ul>
-
             </div>
 
 
-            <!-- COMPANY -->
+            <!-- ========================================================= -->
+            <!-- FEATURES -->
+            <!-- ========================================================= -->
 
             <div>
-
                 <h3
-                    class="font-semibold
-                           text-white
-                           mb-2"
+                    class="
+                        mb-3
+                        font-semibold
+                        text-white
+                    "
                 >
-                    Company
+                    Features
                 </h3>
 
                 <ul
-                    class="space-y-1
-                           text-blue-100"
+                    class="
+                        space-y-2
+                        text-blue-100
+                    "
                 >
-
                     <li>
-                        <a
-                            href="#"
-                            class="hover:text-white
-                                   transition"
-                        >
-                            About
-                        </a>
+                        <span>
+                            AI Smart Search
+                        </span>
                     </li>
 
                     <li>
-                        <a
-                            href="#"
-                            class="hover:text-white
-                                   transition"
-                        >
-                            Contact
-                        </a>
+                        <span>
+                            AI Product Comparison
+                        </span>
                     </li>
 
+                    <li>
+                        <span>
+                            Product Filters
+                        </span>
+                    </li>
+
+                    <li>
+                        <span>
+                            Wishlist & Cart
+                        </span>
+                    </li>
                 </ul>
-
             </div>
 
 
-            <!-- SUPPORT -->
+            <!-- ========================================================= -->
+            <!-- CONNECT -->
+            <!-- ========================================================= -->
 
             <div>
-
                 <h3
-                    class="font-semibold
-                           text-white
-                           mb-2"
+                    class="
+                        mb-3
+                        font-semibold
+                        text-white
+                    "
                 >
-                    Support
+                    Connect
                 </h3>
 
                 <ul
-                    class="space-y-1
-                           text-blue-100"
+                    class="
+                        space-y-2
+                        text-blue-100
+                    "
                 >
-
                     <li>
                         <a
-                            href="#"
-                            class="hover:text-white
-                                   transition"
+                            href="https://devtim.site"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="
+                                transition
+                                hover:text-white
+                            "
                         >
-                            Help Center
+                            My Portfolio
                         </a>
                     </li>
 
                     <li>
                         <a
-                            href="#"
-                            class="hover:text-white
-                                   transition"
+                            href="https://github.com/Timothyminani"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="
+                                transition
+                                hover:text-white
+                            "
                         >
-                            Returns
+                            GitHub
                         </a>
                     </li>
-
                 </ul>
-
-            </div>
-
-
-            <!-- LEGAL -->
-
-            <div>
-
-                <h3
-                    class="font-semibold
-                           text-white
-                           mb-2"
-                >
-                    Legal
-                </h3>
-
-                <ul
-                    class="space-y-1
-                           text-blue-100"
-                >
-
-                    <li>
-                        <a
-                            href="#"
-                            class="hover:text-white
-                                   transition"
-                        >
-                            Privacy Policy
-                        </a>
-                    </li>
-
-                    <li>
-                        <a
-                            href="#"
-                            class="hover:text-white
-                                   transition"
-                        >
-                            Terms
-                        </a>
-                    </li>
-
-                </ul>
-
             </div>
 
         </div>
 
 
+        <!-- ========================================================= -->
         <!-- BOTTOM -->
+        <!-- ========================================================= -->
 
         <div
-            class="border-t
-                   border-blue-800"
+            class="
+                border-t
+                border-blue-800
+            "
         >
-
             <div
-                class="max-w-7xl
-                       mx-auto
-                       px-4
-                       sm:px-6
-                       lg:px-8
-                       py-4
-                       text-center
-                       text-xs
-                       text-blue-100"
+                class="
+                    mx-auto
+                    flex
+                    max-w-7xl
+                    flex-col
+                    items-center
+                    justify-between
+                    gap-2
+                    px-4
+                    py-4
+                    text-center
+                    text-xs
+                    text-blue-100
+                    sm:flex-row
+                    sm:px-6
+                    lg:px-8
+                "
             >
-                © 2026 SmartCart. All rights reserved.
+                <p>
+                    © 2026 SmartCart. A demo e-commerce project built by
+                    <span class="font-semibold text-white">
+                        Timothy Minani
+                    </span>.
+                </p>
+
+                <a
+                    href="https://devtim.site"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="
+                        font-semibold
+                        text-white
+                        transition
+                        hover:text-blue-200
+                        hover:underline
+                    "
+                >
+                    View Portfolio →
+                </a>
             </div>
-
         </div>
-
     </footer>
 </template>

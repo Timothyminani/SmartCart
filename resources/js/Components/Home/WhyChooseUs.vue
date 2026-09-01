@@ -52,7 +52,7 @@ const features = [
     <div
       class="
         grid
-        grid-cols-2
+        grid-cols-1
         gap-3
         md:grid-cols-4
         md:gap-4

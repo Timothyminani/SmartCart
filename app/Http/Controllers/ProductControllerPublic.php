@@ -184,7 +184,9 @@ if (!empty($query)) {
 
     } else {
 
-        $productsQuery->latest();
+         $productsQuery
+        ->orderByDesc('is_featured')
+        ->latest();
 
     }
 
